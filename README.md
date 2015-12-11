@@ -4,6 +4,8 @@ Nim language plugin for Textadept with autocompletion support
 
 Warning! Work still in progress!
 
+![screenshot](https://pp.vk.me/c628719/v628719076/21d34/StSdpW8Hivw.jpg)
+
 ## Features:
 * Autocomplete via nimsuggest (default on Ctrl+Space or when "." is typed)
 * Documentation helper on Ctrl+H
