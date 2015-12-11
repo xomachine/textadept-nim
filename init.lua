@@ -1,43 +1,121 @@
-print("Hello nim!")
 local textadept = require("textadept")
 local events = require("events")
-local nim_executable = "nimsuggest"
+local nimsuggest_executable = "nimsuggest"
+local nim_compiler = "nim"
+local nimble_exe = "nimble"
 
-local handler = nil
-function nim_start_server(file)
-  local handle = spawn(nim_executable.." --stdin --v2 "..file)
-  local nim_shutdown_server = function()
-    handle:write("quit\n\n")
-    handle:close()
-    handle:wait()
+-- list of active nimsuggest sessions
+local active_sessions = {}
+
+-- Starts new nimsuggest session when it doesn't exist
+-- otherwise binds existing session to current buffer
+local function nim_start_session(files)
+  if active_sessions[files] == nil then
+    active_sessions[files] = spawn(nimsuggest_executable.." --stdin --v2 "..files)
   end
-  events.connect(events.QUIT, nim_shutdown_server)
-  return handle
+  buffer.nimsuggest_files = files
 end
 
+-- Closes given nimsuggest session
+local function nim_shutdown_session (nimhandle)
+  print("Shutdown session: "..tostring(nimhandle))
+  if nimhandle ~= nil and nimhandle:status() ~= "terminated" then
+    nimhandle:write("quit\n\n")
+    nimhandle:close()
+  end
+end
+
+-- Checks if any nimsuggest session left without
+-- binding to buffer.
+-- All unbound sessions will be closed
+local on_buffer_delete = function()
+  local to_remove = {}
+  for k, v in ipairs(active_sessions) do
+    local keep = false
+    for i, b in pairs(_BUFFERS) do
+      if b.nimsuggest_files ~= nil then
+        if b.nimsuggest_files == k then keep = true end
+      end
+    end
+    if ~keep then table.insert(to_remove, k) end
+  end
+  for i, v in pairs(to_remove) do
+    nim_shutdown_session(active_sessions[v])
+    active_sessions[v] = nil
+  end
+end
+
+local nim_shutdown_all_sessions = function()
+  for k, v in ipairs(active_sessions) do
+    nim_shutdown_session(v)
+  end
+end
+
+-- Called when editor loads file.
+-- Trying to get information about project and starts nimsuggest
+local on_file_load = function()
+  if buffer ~= nil and buffer:get_lexer(true) == "nim" then
+    buffer.use_tabs = false
+    buffer.tab_width = 2
+    local root_files = {}
+    local proj_root = io.get_project_root(buffer.filename)
+    local srcdir = proj_root
+    print("Project root: "..tostring(proj_root))
+    -- Check if opened file is part of project
+    if proj_root ~= nil then
+      local proj_file = nil
+      -- Search for project file
+      lfs.dir_foreach(proj_root,
+      function(n)
+        if string.match(n, "%.nimble") or string.match(n, "%.babel") then
+          print("Found: "..tostring(n))
+          proj_file = n
+        end
+      end,
+      "!.*","", 0, false)
+      if proj_file ~= nil then
+        buffer.project = proj_root
+        -- Parse project file
+        local backend = "c"
+        for line in io.lines(proj_file) do
+          local newsrc = string.match(line, "srcDir%s*=%s*(.+)$")
+          backend = string.match(line, "backend%s*=%s*(.+)$") or backend
+          if newsrc ~= nil then
+            srcdir = lfs.abspath(newsrc, proj_root)
+          end
+        end
+        buffer.nim_backend = backend
+        -- Search for other sources in project
+        lfs.dir_foreach(srcdir,
+        function(n)
+          table.insert(root_files, n)
+        end,
+        "!%.nim$", "", 0, false)
+      end
+      local files = ""
+      if #root_files > 0 then
+        files = table.concat(root_files," ")
+      else
+        files = buffer.filename
+      end
+      nim_start_session(files)
+      print("Start session: "..tostring(files))
+    end
+  end
+end
+
+
+-- list of request responders
 local requests = {
   sug = function(tokens) 
-      local modulename, stmtname = string.match(tokens.fullname,
-      "([^%.]+)%.(.+)")
-      if modulename == nil then return tokens.fullname end
-      return stmtname 
-    end,
+    local modulename, stmtname = string.match(tokens.fullname,
+    "([^%.]+)%.(.+)")
+    if modulename == nil then return tokens.fullname end
+    return stmtname 
+  end,
   con = function(tokens)
     local inside = string.match(tokens.data,
     "proc%s+%((.*)%)")
-    local modulename, stmtname = string.match(tokens.fullname,
-    "([^%.]+)%.(.+)")
-    local point_pos = buffer.current_pos - 2 - string.len(stmtname)
-    if point_pos > 0 and buffer.char_at[point_pos] == 46 then
-      local pre_arg = do_request("sug", point_pos - 2)
-      for i, v in ipairs(pre_arg) do
-        print("PreArgDef: "..v.stmtkind.." - "..v.fullname)
-      end
-      inside = string.gsub(inside,"[^,]+,?%s*", "", 1)
-    end
-    inside = string.gsub(inside,"var%s+", "")
-    inside = string.gsub(inside,",", "")
-    inside = string.gsub(inside,":%s+", ":")
     return inside
   end,
 
@@ -45,23 +123,38 @@ local requests = {
   def = function(tokens) end,
 }
 
+-- list of additional actions on symbol encountering
+-- for further use
+local actions_on_symbol = {
+  [40] = function(pos)
+    local suggestions = do_request("con", pos)
+    for i, v in pairs(suggestions) do
+      local brackets = string.match(v.data, "%((.*)%)")
+      print("Calltip: "..brackets)
+      buffer:call_tip_show(pos, brackets)
+    end
+  end,
+}
+
+-- Makes request to nimsuggest session bound to current buffer
 function do_request(command, pos)
 
   local dirtyname = ""
-  if handler == nil or handler:status() ~= "running" then
+  local nimhandle = active_sessions[buffer.nimsuggest_files] 
+  if nimhandle == nil or nimhandle:status() ~= "running" then
     print("Nimsuggest not started! Starting now...")
-    handler = nim_start_server(buffer.filename)
+    nim_start_session(buffer.nimsuggest_files or buffer.filename)
   end
   local position = tostring(buffer.line_from_position(pos)+1)..
-    ":".. tostring(buffer.column[pos]+1)
+  ":".. tostring(buffer.column[pos]+1)
   local filename = buffer.filename
   local request = command.." "..filename..dirtyname..":"..position
   print(request)
-  handler:write(request.."\n")
+  nimhandle:write(request.."\n")
   local answer = ""
   local token_list = {}
   repeat
-      answer = handler:read()
+    answer = nimhandle:read()
     no_wait = true
     if answer == "" then
       break
@@ -72,15 +165,16 @@ function do_request(command, pos)
     tokens.line, tokens.col, tokens.comment = string.match(answer, 
     "(%l%l%l)%s+(sk%u%l+)%s+(%S+)%s+(.+)%s+(%S+)%s+(%d+)%s+(%d+)%s+(\".*\")")
     if tokens.reqtype ~= nil then
-      for k, v in  pairs(tokens) do
-        print (k..": "..v)
-      end
+      --for k, v in  pairs(tokens) do
+      --  print (k..": "..v)
+      --end
       table.insert(token_list, tokens)
     end
   until answer == nil
   return token_list
 end
 
+-- Returns a list of suggestions for autocompletion
 function nim_complete(name)
   print("Nim autocompleter call")
   local  command = "sug"
@@ -89,6 +183,9 @@ function nim_complete(name)
     local c = buffer.char_at[buffer.current_pos - i]
     if (c >= 32 and c <= 47)or(c >= 58 and c <= 64)then
       shift = i - 1
+      if actions_on_symbol[c] ~= nil then
+        actions_on_symbol[c](buffer.current_pos - shift)
+      end
       break
     end
   end
@@ -102,4 +199,12 @@ function nim_complete(name)
   print("Shift = "..shift)
   return shift, suggestions
 end
+
+events.connect(events.QUIT, nim_shutdown_all_sessions)
+events.connect(events.FILE_OPENED, on_file_load)
+events.connect(events.BUFFER_DELETED, on_buffer_delete)
 textadept.editing.autocompleters.nim = nim_complete
+textadept.run.compile_commands.nim = function () return nim_compiler.." "..buffer.nim_backend.." %p" end
+textadept.run.run_commands.nim = function () return nim_compiler.." "..buffer.nim_backend.." --run %p" end
+textadept.run.build_commands.nim = function () if buffer.project ~= nil then 
+  return nimble_exe.." build --nimbledir "..buffer.project end end
