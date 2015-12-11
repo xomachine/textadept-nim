@@ -123,21 +123,9 @@ local requests = {
   def = function(tokens) end,
 }
 
--- list of additional actions on symbol encountering
--- for further use
-local actions_on_symbol = {
-  [40] = function(pos)
-    local suggestions = do_request("con", pos)
-    for i, v in pairs(suggestions) do
-      local brackets = string.match(v.data, "%((.*)%)")
-      print("Calltip: "..brackets)
-      buffer:call_tip_show(pos, brackets)
-    end
-  end,
-}
 
 -- Makes request to nimsuggest session bound to current buffer
-function do_request(command, pos)
+local function do_request(command, pos)
 
   local dirtyname = ""
   local semicolon = ""
@@ -183,8 +171,24 @@ function do_request(command, pos)
   return token_list
 end
 
+-- list of additional actions on symbol encountering
+-- for further use
+local actions_on_symbol = {
+  [40] = function(pos)
+    local suggestions = do_request("con", pos)
+    for i, v in pairs(suggestions) do
+      local brackets = string.match(v.data, "%((.*)%)")
+      print("Calltip: "..brackets)
+      buffer:call_tip_show(pos, brackets)
+    end
+  end,
+  [46] = function(pos)
+    textadept.editing.autocomplete("nim")
+  end,
+}
+
 -- Returns a list of suggestions for autocompletion
-function nim_complete(name)
+local function nim_complete(name)
   print("Nim autocompleter call")
   local  command = "sug"
   local shift = 0
@@ -192,9 +196,6 @@ function nim_complete(name)
     local c = buffer.char_at[buffer.current_pos - i]
     if (c >= 32 and c <= 47)or(c >= 58 and c <= 64)then
       shift = i - 1
-      if actions_on_symbol[c] ~= nil then
-        actions_on_symbol[c](buffer.current_pos - shift)
-      end
       break
     end
   end
@@ -205,6 +206,9 @@ function nim_complete(name)
       table.insert(suggestions, requests[v.reqtype](v))
     end
   end
+  if #suggestions == 0 then
+    return textadept.editing.autocompleters.word(name)
+  end
   print("Shift = "..shift)
   return shift, suggestions
 end
@@ -212,6 +216,12 @@ end
 events.connect(events.QUIT, nim_shutdown_all_sessions)
 events.connect(events.FILE_OPENED, on_file_load)
 events.connect(events.BUFFER_DELETED, on_buffer_delete)
+events.connect(events.CHAR_ADDED, function(ch)
+  if buffer:get_lexer() ~= "nim" or ch > 90 then return end
+  if actions_on_symbol[ch] ~= nil then
+    actions_on_symbol[ch](buffer.current_pos)
+  end
+end)
 textadept.editing.autocompleters.nim = nim_complete
 textadept.run.compile_commands.nim = function () return nim_compiler.." "..buffer.nim_backend.." %p" end
 textadept.run.run_commands.nim = function () return nim_compiler.." "..buffer.nim_backend.." --run %p" end
