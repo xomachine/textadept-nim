@@ -140,6 +140,14 @@ local actions_on_symbol = {
 function do_request(command, pos)
 
   local dirtyname = ""
+  local semicolon = ""
+  if buffer.modify then
+    dirtyname = os.tmpname()
+    semicolon = ";"
+    local tmpfile = io.open(dirtyname, "w")
+    tmpfile:write(buffer:get_text())
+    tmpfile:close()
+  end
   local nimhandle = active_sessions[buffer.nimsuggest_files] 
   if nimhandle == nil or nimhandle:status() ~= "running" then
     print("Nimsuggest not started! Starting now...")
@@ -148,7 +156,7 @@ function do_request(command, pos)
   local position = tostring(buffer.line_from_position(pos)+1)..
   ":".. tostring(buffer.column[pos]+1)
   local filename = buffer.filename
-  local request = command.." "..filename..dirtyname..":"..position
+  local request = command.." "..filename..semicolon..dirtyname..":"..position
   print(request)
   nimhandle:write(request.."\n")
   local answer = ""
@@ -171,6 +179,7 @@ function do_request(command, pos)
       table.insert(token_list, tokens)
     end
   until answer == nil
+  os.remove(dirtyname)
   return token_list
 end
 
