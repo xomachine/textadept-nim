@@ -18,7 +18,6 @@ end
 
 -- Closes given nimsuggest session
 local function nim_shutdown_session (nimhandle)
-  print("Shutdown session: "..tostring(nimhandle))
   if nimhandle ~= nil and nimhandle:status() ~= "terminated" then
     nimhandle:write("quit\n\n")
     nimhandle:close()
@@ -60,7 +59,6 @@ local on_file_load = function()
     local root_files = {}
     local proj_root = io.get_project_root(buffer.filename)
     local srcdir = proj_root
-    print("Project root: "..tostring(proj_root))
     -- Check if opened file is part of project
     if proj_root ~= nil then
       local proj_file = nil
@@ -68,7 +66,6 @@ local on_file_load = function()
       lfs.dir_foreach(proj_root,
       function(n)
         if string.match(n, "%.nimble") or string.match(n, "%.babel") then
-          print("Found: "..tostring(n))
           proj_file = n
         end
       end,
@@ -100,7 +97,6 @@ local on_file_load = function()
         files = buffer.filename
       end
       nim_start_session(files)
-      print("Start session: "..tostring(files))
     end
   end
 end
@@ -122,7 +118,6 @@ local function do_request(command, pos)
   end
   local nimhandle = active_sessions[buffer.nimsuggest_files] 
   if nimhandle == nil or nimhandle:status() ~= "running" then
-    print("Nimsuggest not started! Starting now...")
     nim_start_session(buffer.nimsuggest_files or buffer.filename)
   end
   local position = tostring(buffer.line_from_position(pos)+1)..
@@ -137,15 +132,11 @@ local function do_request(command, pos)
     if answer == "" then
       break
     end
-    print("Answer: "..answer)
     local tokens = {}
     tokens.reqtype, tokens.stmtkind, tokens.fullname, tokens.data, tokens.path,
     tokens.line, tokens.col, tokens.comment = string.match(answer, 
     "(%l%l%l)%s+(sk%u%l+)%s+(%S+)%s+(.+)%s+(%S+)%s+(%d+)%s+(%d+)%s+\"(.*)\"")
     if tokens.reqtype ~= nil then
-      --for k, v in  pairs(tokens) do
-      --  print (k..": "..v)
-      --end
       tokens.modulename, tokens.stmtname = string.match(tokens.fullname,
       "([^%.]+)%.(.+)")
       tokens.comment = string.gsub(tokens.comment, "\\x0A", "\n")
@@ -158,6 +149,23 @@ local function do_request(command, pos)
   return token_list
 end
 
+-- Puts cursor to declaration
+local function gotoDeclaration(position)
+  local answer = do_request("def", position)
+  if #answer > 0 then
+    local path = answer[1].path
+    local line = tonumber(answer[1].line) - 1
+    local col = tonumber(answer[1].col)
+    if path ~= buffer.filename then
+      ui.goto_file(path, false, view)
+    end
+    local pos = buffer:find_column(line, col)
+    buffer:goto_pos(pos)
+    buffer:vertical_centre_caret()
+    buffer:word_right_end_extend()
+  end
+end
+
 -- list of additional actions on symbol encountering
 -- for further use
 local actions_on_symbol = {
@@ -165,7 +173,6 @@ local actions_on_symbol = {
     local suggestions = do_request("con", pos)
     for i, v in pairs(suggestions) do
       local brackets = string.match(v.data, "%((.*)%)")
-      print("Calltip: "..brackets)
       buffer:call_tip_show(pos, brackets)
     end
   end,
@@ -176,7 +183,6 @@ local actions_on_symbol = {
 
 -- Returns a list of suggestions for autocompletion
 local function nim_complete(name)
-  print("Nim autocompleter call")
   local  command = "sug"
   local shift = 0
   for i = 1, buffer.column[buffer.current_pos] do
@@ -194,25 +200,27 @@ local function nim_complete(name)
   if #suggestions == 0 then
     return textadept.editing.autocompleters.word(name)
   end
-  print("Shift = "..shift)
   return shift, suggestions
 end
 
 keys.nim = { 
-  
--- Documentation loader on Ctrl-H
+
+  -- Documentation loader on Ctrl-H
   ["ch"] = function()
-  if buffer:get_lexer() == "nim"  then 
-    if textadept.editing.api_files.nim == nil then
-      textadept.editing.api_files.nim = {}
+    if buffer:get_lexer() == "nim"  then 
+      if textadept.editing.api_files.nim == nil then
+        textadept.editing.api_files.nim = {}
+      end
+      local answer = do_request("def", buffer.current_pos)
+      if #answer > 0 then
+        buffer:call_tip_show(buffer.current_pos,
+        answer[1].stmtname.." - "..answer[1].data.."\n"..answer[1].comment)
+      end
     end
-    local answer = do_request("def", buffer.current_pos)
-    if #answer > 0 then
-      buffer:call_tip_show(buffer.current_pos,
-      answer[1].stmtname.." - "..answer[1].data.."\n"..answer[1].comment)
-    end
-  end
-end,
+  end,
+  ["cG"] = function()
+    gotoDeclaration(buffer.current_pos)
+  end,
 }
 
 events.connect(events.QUIT, nim_shutdown_all_sessions)
