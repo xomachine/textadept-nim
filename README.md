@@ -7,6 +7,7 @@ Warning! Work still in progress!
 ## Features:
 * Autocomplete via nimsuggest (default on Ctrl+Space or when "." is typed)
 * Documentation helper on Ctrl+H
+* Goto definition on Ctrl+Shift+G
 * CallTip popups when brace is opened
 * Project build support
 * Compile command depends on backend defined in related nimble file
