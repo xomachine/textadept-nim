@@ -148,6 +148,8 @@ local function do_request(command, pos)
       --end
       tokens.modulename, tokens.stmtname = string.match(tokens.fullname,
       "([^%.]+)%.(.+)")
+      tokens.comment = string.gsub(tokens.comment, "\\x0A", "\n")
+      tokens.comment = string.gsub(tokens.comment, "\\", "")
       if tokens.modulename == nil then tokens.stmtname = tokens.fullname end
       table.insert(token_list, tokens)
     end
@@ -196,18 +198,20 @@ local function nim_complete(name)
   return shift, suggestions
 end
 
--- Documentation loader. Not working for a while
-keys.nim = { ["ch"] = function()
+keys.nim = { 
+  
+-- Documentation loader on Ctrl-H
+  ["ch"] = function()
   if buffer:get_lexer() == "nim"  then 
     if textadept.editing.api_files.nim == nil then
       textadept.editing.api_files.nim = {}
     end
     local answer = do_request("def", buffer.current_pos)
     if #answer > 0 then
-      buffer:call_tip_show(buffer.current_pos, answer[1].stmtname.."\n"..answer[1].comment)
+      buffer:call_tip_show(buffer.current_pos,
+      answer[1].stmtname.." - "..answer[1].data.."\n"..answer[1].comment)
     end
   end
-  textadept.editing.show_documentation()
 end,
 }
 
