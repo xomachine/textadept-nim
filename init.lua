@@ -11,7 +11,7 @@ local active_sessions = {}
 -- otherwise binds existing session to current buffer
 local function nim_start_session(files)
   if active_sessions[files] == nil then
-    active_sessions[files] = spawn(nimsuggest_executable.." --stdin --v2 "..files)
+    active_sessions[files] = spawn(nimsuggest_executable.." --stdin "..files)
   end
   buffer.nimsuggest_files = files
 end
@@ -75,6 +75,7 @@ local on_file_load = function()
       "!.*","", 0, false)
       if proj_file ~= nil then
         buffer.project = proj_root
+        textadept.run.build_commands[buffer.project] = nimble_exe.." build"
         -- Parse project file
         local backend = "c"
         for line in io.lines(proj_file) do
@@ -105,23 +106,6 @@ local on_file_load = function()
 end
 
 
--- list of request responders
-local requests = {
-  sug = function(tokens) 
-    local modulename, stmtname = string.match(tokens.fullname,
-    "([^%.]+)%.(.+)")
-    if modulename == nil then return tokens.fullname end
-    return stmtname 
-  end,
-  con = function(tokens)
-    local inside = string.match(tokens.data,
-    "proc%s+%((.*)%)")
-    return inside
-  end,
-
-  use = function(tokens) end,
-  def = function(tokens) end,
-}
 
 
 -- Makes request to nimsuggest session bound to current buffer
@@ -147,11 +131,9 @@ local function do_request(command, pos)
   local request = command.." "..filename..semicolon..dirtyname..":"..position
   print(request)
   nimhandle:write(request.."\n")
-  local answer = ""
   local token_list = {}
   repeat
-    answer = nimhandle:read()
-    no_wait = true
+    local answer = nimhandle:read()
     if answer == "" then
       break
     end
@@ -159,11 +141,14 @@ local function do_request(command, pos)
     local tokens = {}
     tokens.reqtype, tokens.stmtkind, tokens.fullname, tokens.data, tokens.path,
     tokens.line, tokens.col, tokens.comment = string.match(answer, 
-    "(%l%l%l)%s+(sk%u%l+)%s+(%S+)%s+(.+)%s+(%S+)%s+(%d+)%s+(%d+)%s+(\".*\")")
+    "(%l%l%l)%s+(sk%u%l+)%s+(%S+)%s+(.+)%s+(%S+)%s+(%d+)%s+(%d+)%s+\"(.*)\"")
     if tokens.reqtype ~= nil then
       --for k, v in  pairs(tokens) do
       --  print (k..": "..v)
       --end
+      tokens.modulename, tokens.stmtname = string.match(tokens.fullname,
+      "([^%.]+)%.(.+)")
+      if tokens.modulename == nil then tokens.stmtname = tokens.fullname end
       table.insert(token_list, tokens)
     end
   until answer == nil
@@ -202,9 +187,7 @@ local function nim_complete(name)
   local suggestions = {}
   local token_list = do_request(command, buffer.current_pos-shift)
   for i, v in pairs(token_list) do
-    if requests[v.reqtype] ~= nil then
-      table.insert(suggestions, requests[v.reqtype](v))
-    end
+    table.insert(suggestions, v.stmtname)
   end
   if #suggestions == 0 then
     return textadept.editing.autocompleters.word(name)
@@ -212,6 +195,21 @@ local function nim_complete(name)
   print("Shift = "..shift)
   return shift, suggestions
 end
+
+-- Documentation loader. Not working for a while
+keys.nim = { ["ch"] = function()
+  if buffer:get_lexer() == "nim"  then 
+    if textadept.editing.api_files.nim == nil then
+      textadept.editing.api_files.nim = {}
+    end
+    local answer = do_request("def", buffer.current_pos)
+    if #answer > 0 then
+      buffer:call_tip_show(buffer.current_pos, answer[1].stmtname.."\n"..answer[1].comment)
+    end
+  end
+  textadept.editing.show_documentation()
+end,
+}
 
 events.connect(events.QUIT, nim_shutdown_all_sessions)
 events.connect(events.FILE_OPENED, on_file_load)
@@ -225,5 +223,3 @@ end)
 textadept.editing.autocompleters.nim = nim_complete
 textadept.run.compile_commands.nim = function () return nim_compiler.." "..buffer.nim_backend.." %p" end
 textadept.run.run_commands.nim = function () return nim_compiler.." "..buffer.nim_backend.." --run %p" end
-textadept.run.build_commands.nim = function () if buffer.project ~= nil then 
-  return nimble_exe.." build --nimbledir "..buffer.project end end
