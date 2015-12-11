@@ -29,14 +29,14 @@ end
 -- All unbound sessions will be closed
 local on_buffer_delete = function()
   local to_remove = {}
-  for k, v in ipairs(active_sessions) do
+  for k, v in pairs(active_sessions) do
     local keep = false
-    for i, b in pairs(_BUFFERS) do
+    for i, b in ipairs(_BUFFERS) do
       if b.nimsuggest_files ~= nil then
         if b.nimsuggest_files == k then keep = true end
       end
     end
-    if ~keep then table.insert(to_remove, k) end
+    if not keep then table.insert(to_remove, k) end
   end
   for i, v in pairs(to_remove) do
     nim_shutdown_session(active_sessions[v])
@@ -44,6 +44,7 @@ local on_buffer_delete = function()
   end
 end
 
+-- Stops all nimsuggest sessions
 local nim_shutdown_all_sessions = function()
   for k, v in ipairs(active_sessions) do
     nim_shutdown_session(v)
@@ -119,12 +120,12 @@ local function do_request(command, pos)
   local nimhandle = active_sessions[buffer.nimsuggest_files] 
   if nimhandle == nil or nimhandle:status() ~= "running" then
     nim_start_session(buffer.nimsuggest_files or buffer.filename)
+    nimhandle = active_sessions[buffer.nimsuggest_files] 
   end
   local position = tostring(buffer.line_from_position(pos)+1)..
   ":".. tostring(buffer.column[pos]+1)
   local filename = buffer.filename
   local request = command.." "..filename..semicolon..dirtyname..":"..position
-  print(request)
   nimhandle:write(request.."\n")
   local token_list = {}
   repeat
@@ -218,6 +219,7 @@ keys.nim = {
       end
     end
   end,
+  -- Goto definition on Ctrl-Shift-G
   ["cG"] = function()
     gotoDeclaration(buffer.current_pos)
   end,
