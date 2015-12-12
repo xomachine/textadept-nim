@@ -4,6 +4,12 @@ local nimsuggest_executable = "nimsuggest"
 local nim_compiler = "nim"
 local nimble_exe = "nimble"
 
+-- Keybinds:
+-- API Helper key
+local api_helper_key = "ch"
+-- GoTo Definition key
+local goto_definition_key = "cG"
+
 -- list of active nimsuggest sessions
 local active_sessions = {}
 
@@ -207,7 +213,7 @@ end
 keys.nim = { 
 
   -- Documentation loader on Ctrl-H
-  ["ch"] = function()
+  [api_helper_key] = function()
     if buffer:get_lexer() == "nim"  then 
       if textadept.editing.api_files.nim == nil then
         textadept.editing.api_files.nim = {}
@@ -220,7 +226,7 @@ keys.nim = {
     end
   end,
   -- Goto definition on Ctrl-Shift-G
-  ["cG"] = function()
+  [goto_definition_key] = function()
     gotoDeclaration(buffer.current_pos)
   end,
 }
