@@ -21,28 +21,58 @@ local active_sessions = {}
 -- and returns a table with error fields
 local function parse_errors(answers)
   buffer:annotation_clear_all()
-  for answer in answers:gmatch("[^\n]*") do
+  local nested = nil
+  local previous = nil
+  for answer in answers:gmatch("[^\n]+") do
     local message = {}
-    local filepart, errorpart = answer:match("(.*)(%u%l+:.*)")
-    if filepart ~= nil then
-      message.msgtype, message.text = errorpart:match("(%u%l+):(.*)")
-      message.file, message.line, message.col = filepart:match(
-      "([^%(]+)%s*%(([0-9]+),%s*([0-9]+)%)")
+    message.msgtype, message.text = answer:match("(%u%l+):(.*)")
+    message.file, message.line, message.col = answer:match(
+    "^([^%(]+)%s*%(([0-9]+),%s*([0-9]+)%)")
+    -- If message should be added to previous for 
+    -- recognizing its type
+    if nested ~= nil then
+      print("Nesting "..answer.." to "..nested.file)
+      message.text = answer
+      message.file = nested.file
+      message.line = nested.line
+      -- If message still untyped - look for next one
+      -- otherwise reset "nested" and proceed next message
+      -- in normal way
       if message.msgtype ~= nil then
-        if message.file ~= nil and buffer.filename:match(message.file.."$") ~= nil then 
-          local line = tonumber(message.line) - 1
-          local a = buffer.annotation_text[line]
-          local text = message.msgtype..": " ..message.text
-          if a:len() > 0 then
-            buffer.annotation_text[line] = a.."\n"..text
-          else
-            buffer.annotation_text[line] = text
-          end
-          local style = message_styles[message.msgtype]
-          if style ~= nil and buffer.annotation_style[line] < style then
-            buffer.annotation_style[line] = style
-          end
-        end
+        nested = nil
+      else
+        message.msgtype = "Info"
+      end
+    end
+    -- If unable to parse string after parsed message - append it to the last message
+    if message.msgtype == nil and message.file == nil and previous ~= nil then
+      message = previous
+      message.text = answer
+      message.msgtype = "Info"
+    end
+    if message.file ~= nil and buffer.filename:match(message.file.."$") ~= nil then 
+      previous = message
+      -- If message has no type but associated with file
+      -- it must be generic/template issue and its type
+      -- will be found in next messages
+      -- nested - place where message should be added to
+      if message.msgtype == nil  then
+        print("No message type for file: "..message.file)
+        message.text = answer:match("%)(.*)")
+        nested = message
+        message.msgtype = "Info"
+      end
+      local line = tonumber(message.line) - 1
+      local a = buffer.annotation_text[line]
+      local text = message.msgtype..": " ..message.text
+      if a:len() > 0 then
+        buffer.annotation_text[line] = a.."\n"..text
+      else
+        buffer.annotation_text[line] = text
+      end
+      local style = message_styles[message.msgtype]
+      if style ~= nil and buffer.annotation_style[line] < style then
+        buffer.annotation_style[line] = style
       end
     end
   end
@@ -53,7 +83,6 @@ end
 local function nim_start_session(files)
   if active_sessions[files] == nil then
     active_sessions[files] = spawn(nimsuggest_executable.." --stdin "..files, nil, nil, parse_errors )
-
   end
   buffer.nimsuggest_files = files
 end
@@ -102,6 +131,7 @@ local on_file_load = function()
     local root_files = {}
     local proj_root = io.get_project_root(buffer.filename)
     local srcdir = proj_root
+    local binary = ""
     -- Check if opened file is part of project
     if proj_root ~= nil then
       local proj_file = nil
@@ -120,10 +150,17 @@ local on_file_load = function()
         local backend = "c"
         for line in io.lines(proj_file) do
           local newsrc = string.match(line, "srcDir%s*=%s*(.+)$")
+          local newbinary = line:match("bin%s*=%s*(.+)$")
           backend = string.match(line, "backend%s*=%s*(.+)$") or backend
           if newsrc ~= nil then
             srcdir = lfs.abspath(newsrc, proj_root)
           end
+          if newbinary ~= nil then
+            binary = newbinary..".nim"
+          end
+        end
+        if binary:len() > 0 then
+          binary = lfs.abspath(binary, srcdir)
         end
         buffer.nim_backend = backend
         -- Search for other sources in project
@@ -135,7 +172,9 @@ local on_file_load = function()
       end
       local files = ""
       if #root_files > 0 then
-        files = table.concat(root_files," ")
+        -- binary should be passed last becouse nimsuggest parses config
+        -- only from last file passed
+        files = table.concat(root_files," ").." "..binary
       else
         files = buffer.filename
       end
