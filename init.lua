@@ -12,12 +12,48 @@ local goto_definition_key = "cG"
 
 -- list of active nimsuggest sessions
 local active_sessions = {}
+  local message_styles = {
+    ["Error"] = 15, -- ORANGE
+    ["Hint"]  = 3, -- PALE GREEN
+    ["Warning"] = 13 -- YELLOW,
+  }
+-- Parses output of nimsuggest containing an error
+-- and returns a table with error fields
+local function parse_errors(answers)
+  buffer:annotation_clear_all()
+  for answer in answers:gmatch("[^\n]*") do
+    local message = {}
+    local filepart, errorpart = answer:match("(.*)(%u%l+:.*)")
+    if filepart ~= nil then
+      message.msgtype, message.text = errorpart:match("(%u%l+):(.*)")
+      message.file, message.line, message.col = filepart:match(
+      "([^%(]+)%s*%(([0-9]+),%s*([0-9]+)%)")
+      if message.msgtype ~= nil then
+        if message.file ~= nil and buffer.filename:match(message.file.."$") ~= nil then 
+          local line = tonumber(message.line) - 1
+          local a = buffer.annotation_text[line]
+          local text = message.msgtype..": " ..message.text
+          if a:len() > 0 then
+            buffer.annotation_text[line] = a.."\n"..text
+          else
+            buffer.annotation_text[line] = text
+          end
+          local style = message_styles[message.msgtype]
+          if style ~= nil and buffer.annotation_style[line] < style then
+            buffer.annotation_style[line] = style
+          end
+        end
+      end
+    end
+  end
+end
 
 -- Starts new nimsuggest session when it doesn't exist
 -- otherwise binds existing session to current buffer
 local function nim_start_session(files)
   if active_sessions[files] == nil then
-    active_sessions[files] = spawn(nimsuggest_executable.." --stdin "..files)
+    active_sessions[files] = spawn(nimsuggest_executable.." --stdin "..files, nil, nil, parse_errors )
+
   end
   buffer.nimsuggest_files = files
 end
@@ -108,12 +144,27 @@ local on_file_load = function()
   end
 end
 
-
+-- Parses output of nimsuggest containing a suggestion
+-- and returns a table with suggestion fields
+local function parse_suggestion(answer)
+  local suggestion = {}
+  suggestion.reqtype, suggestion.stmtkind, suggestion.fullname, suggestion.data, suggestion.path,
+  suggestion.line, suggestion.col, suggestion.comment = string.match(answer, 
+  "(%l%l%l)%s+(sk%u%l+)%s+(%S+)%s+(.+)%s+(%S+)%s+(%d+)%s+(%d+)%s+\"(.*)\"")
+  if suggestion.reqtype ~= nil then
+    suggestion.modulename, suggestion.stmtname = string.match(suggestion.fullname,
+    "([^%.]+)%.(.+)")
+    suggestion.comment = string.gsub(suggestion.comment, "\\x0A", "\n")
+    suggestion.comment = string.gsub(suggestion.comment, "\\", "")
+    if suggestion.modulename == nil then suggestion.stmtname = suggestion.fullname end
+    return suggestion
+  end
+end
 
 
 -- Makes request to nimsuggest session bound to current buffer
 local function do_request(command, pos)
-
+  if pos == nil then pos = 0 end
   local dirtyname = ""
   local semicolon = ""
   if buffer.modify then
@@ -133,27 +184,19 @@ local function do_request(command, pos)
   local filename = buffer.filename
   local request = command.." "..filename..semicolon..dirtyname..":"..position
   nimhandle:write(request.."\n")
-  local token_list = {}
+  local message_list = {}
   repeat
     local answer = nimhandle:read()
     if answer == "" then
       break
     end
-    local tokens = {}
-    tokens.reqtype, tokens.stmtkind, tokens.fullname, tokens.data, tokens.path,
-    tokens.line, tokens.col, tokens.comment = string.match(answer, 
-    "(%l%l%l)%s+(sk%u%l+)%s+(%S+)%s+(.+)%s+(%S+)%s+(%d+)%s+(%d+)%s+\"(.*)\"")
-    if tokens.reqtype ~= nil then
-      tokens.modulename, tokens.stmtname = string.match(tokens.fullname,
-      "([^%.]+)%.(.+)")
-      tokens.comment = string.gsub(tokens.comment, "\\x0A", "\n")
-      tokens.comment = string.gsub(tokens.comment, "\\", "")
-      if tokens.modulename == nil then tokens.stmtname = tokens.fullname end
-      table.insert(token_list, tokens)
+    local message = parse_suggestion(answer)
+    if message ~= nil then
+      table.insert(message_list, message)
     end
   until answer == nil
   os.remove(dirtyname)
-  return token_list
+  return message_list
 end
 
 -- Puts cursor to declaration
@@ -187,6 +230,15 @@ local actions_on_symbol = {
     textadept.editing.autocomplete("nim")
   end,
 }
+
+-- Performs syntax check and shows errors
+local function check_syntax()
+  if buffer:get_lexer() ~= "nim" then return end
+  local answers = do_request("chk")
+  for i, v in pairs(answers) do
+    print(tostring(v))
+  end
+end
 
 -- Returns a list of suggestions for autocompletion
 local function nim_complete(name)
@@ -231,8 +283,10 @@ keys.nim = {
   end,
 }
 
+events.connect(events.FILE_AFTER_SAVE, check_syntax)
 events.connect(events.QUIT, nim_shutdown_all_sessions)
 events.connect(events.FILE_OPENED, on_file_load)
+events.connect(events.FILE_OPENED, check_syntax)
 events.connect(events.BUFFER_DELETED, on_buffer_delete)
 events.connect(events.CHAR_ADDED, function(ch)
   if buffer:get_lexer() ~= "nim" or ch > 90 then return end
