@@ -186,15 +186,15 @@ end
 -- Parses output of nimsuggest containing a suggestion
 -- and returns a table with suggestion fields
 local function parse_suggestion(answer)
+  if answer == nil then return end
   local suggestion = {}
   suggestion.reqtype, suggestion.stmtkind, suggestion.fullname, suggestion.data, suggestion.path,
-  suggestion.line, suggestion.col, suggestion.comment = string.match(answer, 
+  suggestion.line, suggestion.col, suggestion.comment = answer:match( 
   "(%l%l%l)%s+(sk%u%l+)%s+(%S+)%s+(.+)%s+(%S+)%s+(%d+)%s+(%d+)%s+\"(.*)\"")
   if suggestion.reqtype ~= nil then
-    suggestion.modulename, suggestion.stmtname = string.match(suggestion.fullname,
-    "([^%.]+)%.(.+)")
-    suggestion.comment = string.gsub(suggestion.comment, "\\x0A", "\n")
-    suggestion.comment = string.gsub(suggestion.comment, "\\", "")
+    suggestion.modulename, suggestion.stmtname = suggestion.fullname:match("([^%.]+)%.(.+)")
+    suggestion.comment = suggestion.comment:gsub("\\x0A", "\n")
+    suggestion.comment = suggestion.comment:gsub("\\", "")
     if suggestion.modulename == nil then suggestion.stmtname = suggestion.fullname end
     return suggestion
   end
