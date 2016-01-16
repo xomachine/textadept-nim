@@ -3,6 +3,12 @@ local events = require("events")
 local nimsuggest_executable = "nimsuggest"
 local nim_compiler = "nim"
 local nimble_exe = "nimble"
+-- Windows executable names 
+if WIN32 then
+  nimsuggest_executable = nimsuggest_executable .. ".exe"
+  nim_compiler = nim_compiler .. ".exe"
+  nimble_exe = nimble_exe .. ".exe"
+end
 
 -- Keybinds:
 -- API Helper key
@@ -12,14 +18,16 @@ local goto_definition_key = "cG"
 
 -- list of active nimsuggest sessions
 local active_sessions = {}
-  local message_styles = {
-    ["Error"] = 15, -- ORANGE
-    ["Hint"]  = 3, -- PALE GREEN
-    ["Warning"] = 13 -- YELLOW,
-  }
--- Parses output of nimsuggest containing an error
--- and returns a table with error fields
+-- colors of compiller messages
+local message_styles = {
+  ["Error"] = 15, -- ORANGE
+  ["Hint"]  = 3, -- PALE GREEN
+  ["Warning"] = 13 -- YELLOW,
+}
+
 local function parse_errors(answers)
+  -- Parses output of nimsuggest containing an error
+  -- and returns a table with error fields
   buffer:annotation_clear_all()
   local nested = nil
   local previous = nil
@@ -78,27 +86,31 @@ local function parse_errors(answers)
   end
 end
 
--- Starts new nimsuggest session when it doesn't exist
--- otherwise binds existing session to current buffer
 local function nim_start_session(files)
+  -- Starts new nimsuggest session when it doesn't exist
+  -- otherwise binds existing session to current buffer
   if active_sessions[files] == nil then
     active_sessions[files] = spawn(nimsuggest_executable.." --stdin "..files, nil, nil, parse_errors )
+    if active_sessions[files] == nil or active_sessions[files]:status() ~= "running" then
+      error("Cannot start nimsuggest!")
+    end
   end
   buffer.nimsuggest_files = files
 end
 
--- Closes given nimsuggest session
+
 local function nim_shutdown_session (nimhandle)
+  -- Closes given nimsuggest session
   if nimhandle ~= nil and nimhandle:status() ~= "terminated" then
     nimhandle:write("quit\n\n")
     nimhandle:close()
   end
 end
 
--- Checks if any nimsuggest session left without
--- binding to buffer.
--- All unbound sessions will be closed
 local on_buffer_delete = function()
+  -- Checks if any nimsuggest session left without
+  -- binding to buffer.
+  -- All unbound sessions will be closed
   local to_remove = {}
   for k, v in pairs(active_sessions) do
     local keep = false
@@ -115,30 +127,30 @@ local on_buffer_delete = function()
   end
 end
 
--- Stops all nimsuggest sessions
 local nim_shutdown_all_sessions = function()
+  -- Stops all nimsuggest sessions
   for k, v in ipairs(active_sessions) do
     nim_shutdown_session(v)
   end
 end
 
--- Called when editor loads file.
--- Trying to get information about project and starts nimsuggest
 local on_file_load = function()
+  -- Called when editor loads file.
+  -- Trying to get information about project and starts nimsuggest
   if buffer ~= nil and buffer:get_lexer(true) == "nim" then
     buffer.use_tabs = false
     buffer.tab_width = 2
     local root_files = {}
     local proj_root = io.get_project_root(buffer.filename)
     local srcdir = proj_root
-    local binary = ""
+    local binary = nil
     -- Check if opened file is part of project
     if proj_root ~= nil then
       local proj_file = nil
       -- Search for project file
       lfs.dir_foreach(proj_root,
       function(n)
-        if string.match(n, "%.nimble") or string.match(n, "%.babel") then
+        if n:match("%.nimble") or n:match("%.babel") then
           proj_file = n
         end
       end,
@@ -159,7 +171,7 @@ local on_file_load = function()
             binary = newbinary..".nim"
           end
         end
-        if binary:len() > 0 then
+        if binary and binary:len() > 0 then
           binary = lfs.abspath(binary, srcdir)
         end
         buffer.nim_backend = backend
@@ -174,7 +186,8 @@ local on_file_load = function()
       if #root_files > 0 then
         -- binary should be passed last becouse nimsuggest parses config
         -- only from last file passed
-        files = table.concat(root_files," ").." "..binary
+        -- files = table.concat(root_files," ").." "..binary
+        files = binary or buffer.filename or proj_root.."*.nim"
       else
         files = buffer.filename
       end
@@ -183,9 +196,9 @@ local on_file_load = function()
   end
 end
 
--- Parses output of nimsuggest containing a suggestion
--- and returns a table with suggestion fields
 local function parse_suggestion(answer)
+  -- Parses output of nimsuggest containing a suggestion
+  -- and returns a table with suggestion fields
   if answer == nil then return end
   local suggestion = {}
   suggestion.reqtype, suggestion.stmtkind, suggestion.fullname, suggestion.data, suggestion.path,
@@ -201,8 +214,8 @@ local function parse_suggestion(answer)
 end
 
 
--- Makes request to nimsuggest session bound to current buffer
 local function do_request(command, pos)
+  -- Makes request to nimsuggest session bound to current buffer
   if pos == nil then pos = 0 end
   local dirtyname = ""
   local semicolon = ""
@@ -238,8 +251,9 @@ local function do_request(command, pos)
   return message_list
 end
 
--- Puts cursor to declaration
+
 local function gotoDeclaration(position)
+  -- Puts cursor to declaration
   local answer = do_request("def", position)
   if #answer > 0 then
     local path = answer[1].path
@@ -270,17 +284,18 @@ local actions_on_symbol = {
   end,
 }
 
--- Performs syntax check and shows errors
 local function check_syntax()
+  -- Performs syntax check and shows errors
   if buffer:get_lexer() ~= "nim" then return end
   local answers = do_request("chk")
+  if answers == nil then return end
   for i, v in pairs(answers) do
     print(tostring(v))
   end
 end
 
--- Returns a list of suggestions for autocompletion
 local function nim_complete(name)
+  -- Returns a list of suggestions for autocompletion
   local  command = "sug"
   local shift = 0
   for i = 1, buffer.column[buffer.current_pos] do
@@ -302,7 +317,6 @@ local function nim_complete(name)
 end
 
 keys.nim = { 
-
   -- Documentation loader on Ctrl-H
   [api_helper_key] = function()
     if buffer:get_lexer() == "nim"  then 
@@ -328,10 +342,9 @@ events.connect(events.FILE_OPENED, on_file_load)
 events.connect(events.FILE_OPENED, check_syntax)
 events.connect(events.BUFFER_DELETED, on_buffer_delete)
 events.connect(events.CHAR_ADDED, function(ch)
-  if buffer:get_lexer() ~= "nim" or ch > 90 then return end
-  if actions_on_symbol[ch] ~= nil then
-    actions_on_symbol[ch](buffer.current_pos)
-  end
+  if buffer:get_lexer() ~= "nim" or ch > 90 or actions_on_symbol[ch] == nil
+  then return end
+  actions_on_symbol[ch](buffer.current_pos)
 end)
 textadept.editing.autocompleters.nim = nim_complete
 textadept.run.compile_commands.nim = function () return nim_compiler.." "..buffer.nim_backend.." %p" end
