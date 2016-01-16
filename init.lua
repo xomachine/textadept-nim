@@ -25,6 +25,10 @@ local message_styles = {
   ["Warning"] = 13 -- YELLOW,
 }
 
+local function check_executable(exe)
+  return (0 == os.execute(exe.." --help"))
+end
+
 local function parse_errors(answers)
   -- Parses output of nimsuggest containing an error
   -- and returns a table with error fields
@@ -157,7 +161,9 @@ local on_file_load = function()
       "!.*","", 0, false)
       if proj_file ~= nil then
         buffer.project = proj_root
-        textadept.run.build_commands[buffer.project] = nimble_exe.." build"
+        if check_executable(nimble_exe) then
+          textadept.run.build_commands[buffer.project] = nimble_exe.." build"
+        end
         -- Parse project file
         local backend = "c"
         for line in io.lines(proj_file) do
@@ -336,16 +342,20 @@ keys.nim = {
   end,
 }
 
-events.connect(events.FILE_AFTER_SAVE, check_syntax)
-events.connect(events.QUIT, nim_shutdown_all_sessions)
-events.connect(events.FILE_OPENED, on_file_load)
-events.connect(events.FILE_OPENED, check_syntax)
-events.connect(events.BUFFER_DELETED, on_buffer_delete)
-events.connect(events.CHAR_ADDED, function(ch)
-  if buffer:get_lexer() ~= "nim" or ch > 90 or actions_on_symbol[ch] == nil
-  then return end
-  actions_on_symbol[ch](buffer.current_pos)
-end)
-textadept.editing.autocompleters.nim = nim_complete
-textadept.run.compile_commands.nim = function () return nim_compiler.." "..buffer.nim_backend.." %p" end
-textadept.run.run_commands.nim = function () return nim_compiler.." "..buffer.nim_backend.." --run %p" end
+if check_executable(nimsuggest_executable) then
+  events.connect(events.FILE_AFTER_SAVE, check_syntax)
+  events.connect(events.QUIT, nim_shutdown_all_sessions)
+  events.connect(events.FILE_OPENED, on_file_load)
+  events.connect(events.FILE_OPENED, check_syntax)
+  events.connect(events.BUFFER_DELETED, on_buffer_delete)
+  events.connect(events.CHAR_ADDED, function(ch)
+    if buffer:get_lexer() ~= "nim" or ch > 90 or actions_on_symbol[ch] == nil
+    then return end
+    actions_on_symbol[ch](buffer.current_pos)
+  end)
+  textadept.editing.autocompleters.nim = nim_complete
+end
+if check_executable(nim_compiler) then
+  textadept.run.compile_commands.nim = function () return nim_compiler.." "..buffer.nim_backend.." %p" end
+  textadept.run.run_commands.nim = function () return nim_compiler.." "..buffer.nim_backend.." --run %p" end
+end
