@@ -33,7 +33,8 @@ local function error_handler(err)
   -- Prints debug information when nimsuggest prints
   -- anything to stderr
   local handler_status = "N/A"
-  if tonumber(err) then
+  if type(err) == "number" then
+    if err == 0 then return end -- When exited normally
     err = "Nimsuggest crushed with error code: "..err
   end
   if buffer.nimsuggest_files then
