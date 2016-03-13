@@ -94,7 +94,8 @@ local function nim_start_session(files)
   -- Starts new nimsuggest session when it doesn't exist
   -- otherwise binds existing session to current buffer
   if active_sessions[files] == nil then
-    active_sessions[files] = spawn(nimsuggest_executable.." --stdin "..files, nil, nil, parse_errors )
+    local current_dir = buffer.filename:match("^(.-)[^/\\]+$")
+    active_sessions[files] = spawn(nimsuggest_executable.." --stdin "..files, current_dir, nil, parse_errors )
     if active_sessions[files] == nil or active_sessions[files]:status() ~= "running" then
       error("Cannot start nimsuggest!")
     end
