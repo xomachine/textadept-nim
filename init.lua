@@ -40,7 +40,7 @@ local function error_handler(err)
     local handler = active_sessions[buffer.nimsuggest_files]
     if handler then
       handler_status = handler:status()
-      
+      active_sessions[buffer.nimsuggest_files] = nil
     end
   end
   ui.dialogs.textbox({
@@ -49,6 +49,8 @@ local function error_handler(err)
     "Please attach this debug output to your bugreport.",
     text=err.."\nOpened file name: "..buffer.filename..
     "\nFilename passed to nimsuggest: "..buffer.nimsuggest_files..
+    "\nWorking directory: "..tostring(buffer.filename:match("^([%p%w]-)[^/\\]+$"))..
+    "\nProject root: "..tostring(io.get_project_root(buffer.filename))..
     "\nHandler status: "..handler_status
     })
 end
@@ -122,8 +124,8 @@ local function nim_start_session(files)
   -- Starts new nimsuggest session when it doesn't exist
   -- otherwise binds existing session to current buffer
   if active_sessions[files] == nil then
-    local current_dir = buffer.filename:match("^(.-)[^/\\]+$")
-    active_sessions[files] = spawn(nimsuggest_executable.." --stdin "..files, current_dir, error_handler, parse_errors, error_handler)
+    local current_dir = io.get_project_root(buffer.filename) or buffer.filename:match("^([%p%w]-)[^/\\]+$") or "."
+    active_sessions[files] = spawn(nimsuggest_executable.." --stdin "..files, current_dir , error_handler, parse_errors, error_handler)
     if active_sessions[files] == nil or active_sessions[files]:status() ~= "running" then
       error("Cannot start nimsuggest!")
     end
