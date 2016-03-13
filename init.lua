@@ -29,12 +29,40 @@ local function check_executable(exe)
   return (nil ~= io.popen(exe.." -v"):read())
 end
 
+local function error_handler(err)
+  -- Prints debug information when nimsuggest prints
+  -- anything to stderr
+  local handler_status = "N/A"
+  if tonumber(err) then
+    err = "Nimsuggest crushed with error code: "..err
+  end
+  if buffer.nimsuggest_files then
+    local handler = active_sessions[buffer.nimsuggest_files]
+    if handler then
+      handler_status = handler:status()
+      
+    end
+  end
+  ui.dialogs.textbox({
+    title="Nimsuggest reported an error",
+    informative_text="Nimsuggest reported an error!\n"..
+    "Please attach this debug output to your bugreport.",
+    text=err.."\nOpened file name: "..buffer.filename..
+    "\nFilename passed to nimsuggest: "..buffer.nimsuggest_files..
+    "\nHandler status: "..handler_status
+    })
+end
+
 local function parse_errors(answers)
   -- Parses output of nimsuggest containing an error
   -- and returns a table with error fields
   buffer:annotation_clear_all()
   local nested = nil
   local previous = nil
+  if answers:match("^Error") then
+    error_handler(answers)
+    return nil
+  end
   for answer in answers:gmatch("[^\n]+") do
     local message = {}
     message.msgtype, message.text = answer:match("(%u%l+):(.*)")
@@ -95,14 +123,13 @@ local function nim_start_session(files)
   -- otherwise binds existing session to current buffer
   if active_sessions[files] == nil then
     local current_dir = buffer.filename:match("^(.-)[^/\\]+$")
-    active_sessions[files] = spawn(nimsuggest_executable.." --stdin "..files, current_dir, nil, parse_errors )
+    active_sessions[files] = spawn(nimsuggest_executable.." --stdin "..files, current_dir, error_handler, parse_errors, error_handler)
     if active_sessions[files] == nil or active_sessions[files]:status() ~= "running" then
       error("Cannot start nimsuggest!")
     end
   end
   buffer.nimsuggest_files = files
 end
-
 
 local function nim_shutdown_session (nimhandle)
   -- Closes given nimsuggest session
