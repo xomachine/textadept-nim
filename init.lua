@@ -26,7 +26,7 @@ local message_styles = {
 }
 
 local function check_executable(exe)
-  return (nil ~= io.popen(exe):read())
+  return (nil ~= io.popen(exe.. " -v"):read('*all'))
 end
 
 local function error_handler(err)
