@@ -352,26 +352,6 @@ local function nim_complete(name)
   return shift, suggestions
 end
 
-keys.nim = { 
-  -- Documentation loader on Ctrl-H
-  [api_helper_key] = function()
-    if buffer:get_lexer() == "nim"  then 
-      if textadept.editing.api_files.nim == nil then
-        textadept.editing.api_files.nim = {}
-      end
-      local answer = do_request("def", buffer.current_pos)
-      if #answer > 0 then
-        buffer:call_tip_show(buffer.current_pos,
-        answer[1].stmtname.." - "..answer[1].data.."\n"..answer[1].comment)
-      end
-    end
-  end,
-  -- Goto definition on Ctrl-Shift-G
-  [goto_definition_key] = function()
-    gotoDeclaration(buffer.current_pos)
-  end,
-}
-
 if check_executable(nimsuggest_executable) then
   events.connect(events.FILE_AFTER_SAVE, check_syntax)
   events.connect(events.QUIT, nim_shutdown_all_sessions)
@@ -383,6 +363,25 @@ if check_executable(nimsuggest_executable) then
     then return end
     actions_on_symbol[ch](buffer.current_pos)
   end)
+  keys.nim = { 
+    -- Documentation loader on Ctrl-H
+    [api_helper_key] = function()
+      if buffer:get_lexer() == "nim"  then 
+        if textadept.editing.api_files.nim == nil then
+          textadept.editing.api_files.nim = {}
+        end
+        local answer = do_request("def", buffer.current_pos)
+        if #answer > 0 then
+          buffer:call_tip_show(buffer.current_pos,
+          answer[1].stmtname.." - "..answer[1].data.."\n"..answer[1].comment)
+        end
+      end
+    end,
+    -- Goto definition on Ctrl-Shift-G
+    [goto_definition_key] = function()
+      gotoDeclaration(buffer.current_pos)
+    end,
+  }
   textadept.editing.autocompleters.nim = nim_complete
 end
 if check_executable(nim_compiler) then
