@@ -175,6 +175,7 @@ local on_file_load = function()
   if buffer ~= nil and buffer:get_lexer(true) == "nim" then
     buffer.use_tabs = false
     buffer.tab_width = 2
+    buffer.nim_backend = "c"
     local root_files = {}
     local proj_root = io.get_project_root(buffer.filename)
     local srcdir = proj_root
@@ -196,11 +197,10 @@ local on_file_load = function()
           textadept.run.build_commands[buffer.project] = nimble_exe.." build"
         end
         -- Parse project file
-        local backend = "c"
         for line in io.lines(proj_file) do
           local newsrc = string.match(line, "srcDir%s*=%s*(.+)$")
           local newbinary = line:match("bin%s*=%s*(.+)$")
-          backend = string.match(line, "backend%s*=%s*(.+)$") or backend
+          buffer.nim_backend = string.match(line, "backend%s*=%s*(.+)$") or buffer.nim_backend
           if newsrc ~= nil then
             srcdir = lfs.abspath(newsrc, proj_root)
           end
@@ -211,7 +211,6 @@ local on_file_load = function()
         if binary and binary:len() > 0 then
           binary = lfs.abspath(binary, srcdir)
         end
-        buffer.nim_backend = backend
         -- Search for other sources in project
         lfs.dir_foreach(srcdir,
         function(n)
