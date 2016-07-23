@@ -3,6 +3,7 @@ local events = require("events")
 local nimsuggest_executable = "nimsuggest"
 local nim_compiler = "nim"
 local nimble_exe = "nimble"
+local icons = require("textadept-nim.icons")
 -- Windows executable names 
 if WIN32 then
   nimsuggest_executable = nimsuggest_executable .. ".exe"
@@ -344,11 +345,12 @@ local function nim_complete(name)
   local suggestions = {}
   local token_list = do_request(command, buffer.current_pos-shift)
   for i, v in pairs(token_list) do
-    table.insert(suggestions, v.stmtname)
+    table.insert(suggestions, v.stmtname.."?"..icons[v.stmtkind])
   end
   if #suggestions == 0 then
     return textadept.editing.autocompleters.word(name)
   end
+  icons:register()
   return shift, suggestions
 end
 
