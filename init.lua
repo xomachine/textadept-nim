@@ -4,6 +4,7 @@ local nimsuggest_executable = "nimsuggest"
 local nim_compiler = "nim"
 local nimble_exe = "nimble"
 local icons = require("textadept-nim.icons")
+local nimsuggest = require("textadept-nim.nimsuggest")
 -- Windows executable names 
 if WIN32 then
   nimsuggest_executable = nimsuggest_executable .. ".exe"
