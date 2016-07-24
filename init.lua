@@ -178,125 +178,18 @@ local on_file_load = function()
     buffer.use_tabs = false
     buffer.tab_width = 2
     buffer.nim_backend = "c"
-    local root_files = {}
-    local proj_root = io.get_project_root(buffer.filename)
-    local srcdir = proj_root
-    local binary = nil
-    -- Check if opened file is part of project
-    if proj_root ~= nil then
-      local proj_file = nil
-      -- Search for project file
-      lfs.dir_foreach(proj_root,
-      function(n)
-        if n:match("%.nimble") or n:match("%.babel") then
-          proj_file = n
-        end
-      end,
-      "!.*","", 0, false)
-      if proj_file ~= nil then
-        buffer.project = proj_root
-        if check_executable(nimble_exe) then
-          textadept.run.build_commands[buffer.project] = nimble_exe.." build"
-        end
-        -- Parse project file
-        for line in io.lines(proj_file) do
-          local newsrc = string.match(line, "srcDir%s*=%s*(.+)$")
-          local newbinary = line:match("bin%s*=%s*(.+)$")
-          buffer.nim_backend = string.match(line, "backend%s*=%s*(.+)$") or buffer.nim_backend
-          if newsrc ~= nil then
-            srcdir = lfs.abspath(newsrc, proj_root)
-          end
-          if newbinary ~= nil then
-            binary = newbinary..".nim"
-          end
-        end
-        if binary and binary:len() > 0 then
-          binary = lfs.abspath(binary, srcdir)
-        end
-        -- Search for other sources in project
-        lfs.dir_foreach(srcdir,
-        function(n)
-          table.insert(root_files, n)
-        end,
-        "!%.nim$", "", 0, false)
-      end
-      local files = ""
-      if #root_files > 0 then
-        -- binary should be passed last becouse nimsuggest parses config
-        -- only from last file passed
-        -- files = table.concat(root_files," ").." "..binary
-        files = binary or buffer.filename or proj_root.."*.nim"
-      else
-        files = buffer.filename
-      end
-      nim_start_session(files)
-    end
   end
 end
 
-local function parse_suggestion(answer)
-  -- Parses output of nimsuggest containing a suggestion
-  -- and returns a table with suggestion fields
-  if answer == nil then return end
-  local suggestion = {}
-  suggestion.reqtype, suggestion.stmtkind, suggestion.fullname, suggestion.data, suggestion.path,
-  suggestion.line, suggestion.col, suggestion.comment = answer:match( 
-  "(%l%l%l)%s+(sk%u%l+)%s+(%S+)%s+(.+)%s+(%S+)%s+(%d+)%s+(%d+)%s+\"(.*)\"")
-  if suggestion.reqtype ~= nil then
-    suggestion.modulename, suggestion.stmtname = suggestion.fullname:match("([^%.]+)%.(.+)")
-    suggestion.comment = suggestion.comment:gsub("\\x0A", "\n")
-    suggestion.comment = suggestion.comment:gsub("\\", "")
-    if suggestion.modulename == nil then suggestion.stmtname = suggestion.fullname end
-    return suggestion
-  end
-end
-
-
-local function do_request(command, pos)
-  -- Makes request to nimsuggest session bound to current buffer
-  if pos == nil then pos = 0 end
-  local dirtyname = ""
-  local semicolon = ""
-  if buffer.modify then
-    dirtyname = os.tmpname()
-    semicolon = ";"
-    local tmpfile = io.open(dirtyname, "w")
-    tmpfile:write(buffer:get_text())
-    tmpfile:close()
-  end
-  local nimhandle = active_sessions[buffer.nimsuggest_files] 
-  if nimhandle == nil or nimhandle:status() ~= "running" then
-    nim_start_session(buffer.nimsuggest_files or buffer.filename)
-    nimhandle = active_sessions[buffer.nimsuggest_files] 
-  end
-  local position = tostring(buffer.line_from_position(pos)+1)..
-  ":".. tostring(buffer.column[pos]+1)
-  local filename = buffer.filename
-  local request = command.." "..filename..semicolon..dirtyname..":"..position
-  nimhandle:write(request.."\n")
-  local message_list = {}
-  repeat
-    local answer = nimhandle:read()
-    if answer == "" then
-      break
-    end
-    local message = parse_suggestion(answer)
-    if message ~= nil then
-      table.insert(message_list, message)
-    end
-  until answer == nil
-  os.remove(dirtyname)
-  return message_list
-end
 
 
 local function gotoDeclaration(position)
   -- Puts cursor to declaration
-  local answer = do_request("def", position)
+  local answer = nimsuggest.definition(position)
   if #answer > 0 then
-    local path = answer[1].path
+    local path = answer[1].file
     local line = tonumber(answer[1].line) - 1
-    local col = tonumber(answer[1].col)
+    local col = tonumber(answer[1].column)
     if path ~= buffer.filename then
       ui.goto_file(path, false, view)
     end
@@ -311,9 +204,9 @@ end
 -- for further use
 local actions_on_symbol = {
   [40] = function(pos)
-    local suggestions = do_request("con", pos)
+    local suggestions = nimsuggest.context(pos)
     for i, v in pairs(suggestions) do
-      local brackets = string.match(v.data, "%((.*)%)")
+      local brackets = v.type:match("%((.*)%)")
       buffer:call_tip_show(pos, brackets)
     end
   end,
@@ -325,11 +218,7 @@ local actions_on_symbol = {
 local function check_syntax()
   -- Performs syntax check and shows errors
   if buffer:get_lexer() ~= "nim" then return end
-  local answers = do_request("chk")
-  if answers == nil then return end
-  for i, v in pairs(answers) do
-    print(tostring(v))
-  end
+  nimsuggest.check()
 end
 
 local function nim_complete(name)
@@ -344,9 +233,9 @@ local function nim_complete(name)
     end
   end
   local suggestions = {}
-  local token_list = do_request(command, buffer.current_pos-shift)
+  local token_list = nimsuggest.suggest(buffer.current_pos-shift)
   for i, v in pairs(token_list) do
-    table.insert(suggestions, v.stmtname.."?"..icons[v.stmtkind])
+    table.insert(suggestions, v.name.."?"..icons[v.skind])
   end
   if #suggestions == 0 then
     return textadept.editing.autocompleters.word(name)
@@ -373,10 +262,10 @@ if check_executable(nimsuggest_executable) then
         if textadept.editing.api_files.nim == nil then
           textadept.editing.api_files.nim = {}
         end
-        local answer = do_request("def", buffer.current_pos)
+        local answer = nimsuggest.definition(buffer.current_pos)
         if #answer > 0 then
           buffer:call_tip_show(buffer.current_pos,
-          answer[1].stmtname.." - "..answer[1].data.."\n"..answer[1].comment)
+          answer[1].name.." - "..answer[1].type.."\n"..answer[1].comment)
         end
       end
     end,
