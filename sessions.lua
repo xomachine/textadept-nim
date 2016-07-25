@@ -29,8 +29,6 @@ local function parse_suggestion(answer)
   else
     return
   end
-  
-  
   return suggestion
 end
 
@@ -106,6 +104,8 @@ function _M:detach(filename)
 end
 
 function _M:request(command, filename)
+  -- Requesting nimsuggest to do command and returns
+  -- parsed answer as a structure
   local nimhandle = _M:get_handle(filename)
   nimhandle:write(command.."\n")
   local message_list = {}
