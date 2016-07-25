@@ -5,6 +5,7 @@ local nim_compiler = "nim"
 local nimble_exe = "nimble"
 local icons = require("textadept-nim.icons")
 local nimsuggest = require("textadept-nim.nimsuggest")
+local check_executable = require("textadept-nim.utils").check_executable
 -- Windows executable names 
 if WIN32 then
   nimsuggest_executable = nimsuggest_executable .. ".exe"
@@ -27,9 +28,7 @@ local message_styles = {
   ["Warning"] = 13 -- YELLOW,
 }
 
-local function check_executable(exe)
-  return (nil ~= io.popen(exe.. " -v"):read('*all'))
-end
+
 
 local function nim_start_session(files)
   -- Starts new nimsuggest session when it doesn't exist

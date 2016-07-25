@@ -17,4 +17,8 @@ function _M.check_type(t, ...)
   end
 end
 
+function _M.check_executable(exe)
+  return (nil ~= io.popen(exe.. " -v"):read('*all'))
+end
+
 return _M
