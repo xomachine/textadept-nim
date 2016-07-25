@@ -6,6 +6,8 @@ local nimble_exe = "nimble"
 local icons = require("textadept-nim.icons")
 local nimsuggest = require("textadept-nim.nimsuggest")
 local check_executable = require("textadept-nim.utils").check_executable
+local sessions = require("textadept-nim.sessions")
+local nim_shutdown_all_sessions = function() sessions:stop_all() end
 -- Windows executable names 
 if WIN32 then
   nimsuggest_executable = nimsuggest_executable .. ".exe"
@@ -71,12 +73,7 @@ local on_buffer_delete = function()
   end
 end
 
-local nim_shutdown_all_sessions = function()
-  -- Stops all nimsuggest sessions
-  for k, v in ipairs(active_sessions) do
-    nim_shutdown_session(v)
-  end
-end
+
 
 local on_file_load = function()
   -- Called when editor loads file.
