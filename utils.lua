@@ -21,4 +21,14 @@ function _M.check_executable(exe)
   return (nil ~= io.popen(exe.. " -v"):read('*all'))
 end
 
+function _M.file_exists(filename)
+  local f = open(filename, "r")
+  if f ~= nil
+  then
+    f:close()
+    return true
+  end
+  return false
+end
+
 return _M

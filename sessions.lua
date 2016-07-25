@@ -2,7 +2,7 @@ local check_type = require("textadept-nim.utils").check_type
 local errortips = require("textadept-nim.errortips")
 local parse_errors = errortips.parse_errors
 local error_handler = errortips.error_handler
-local get_root = require("textadept-nim.project").detect_project_root
+local get_project = require("textadept-nim.project").detect_project
 local nimsuggest_executable = require("textadept-nim.constants").nimsuggest_exe
 
 local _M = {}
@@ -18,14 +18,20 @@ function _M:get_handle(filename)
   -- Creates new session for file if it isn't exist and returns
   -- handle for the session
   check_type("string", filename)
-  local session_name = _M.session_of[filename] or get_root(filename)
-  
-  if _M.active[session_name] == nil 
+  local session_name = _M.session_of[filename]
+  if session_name == nil
   then
-    _M.active[session_name] = {name = session_name}
+    local project = get_project(filename)
+    session_name = project.root
+    if _M.active[session_name] == nil
+    then
+      _M.active[session_name] = {name = session_name, project = project}
+    else
+      _M.active[session_name].project = project
+    end
+    _M.session_of[filename] = session_name
   end
   local session = _M.active[session_name]
-
   if session.handle == nil or
     session.handle:status() ~= "running"
   then

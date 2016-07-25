@@ -1,9 +1,37 @@
-local check_type = require("textadept-nim.utils").check_type
+local utils = require("textadept-nim.utils")
+local check_type =  utils.check_type
+local file_exists = utils.file_exists
 local _M = {}
 
 local sep = WIN32 and "\\" or "/"
 
-function _M.detect_project_root(filename)
+local function parse_nimble(filename)
+  check_type("string", filename)
+  local project = {}
+  project.backend = "c" -- nimble builds project in C by default
+-- parse nimble file
+  for line in io.lines(filename)
+  do
+    local key, val = line:match("^%s*(%S+)%s*=%s*(%S+)")
+    if key == "bin"
+    then
+      project.bin = val
+    elseif key == "srcDir"
+    then
+      project.srcdir = val
+    elseif key == "backend"
+    then
+      project.backend = val
+    elseif line:match("setCommand") ~= nil
+    then
+      project.backend = line:match("setCommand%s+\"(%a+)\"")
+    end
+  end
+  return project
+end
+
+
+function _M.detect_project(filename)
   -- Trying to obtain project root file 
   -- If not succeed returns passed filename
   check_type("string", filename)
@@ -23,26 +51,34 @@ function _M.detect_project_root(filename)
   
   if #nimble_file > 0
   then
-    -- parse nimble file
-    local srcdir = ""
-    local bin = ""
-    for line in io.lines(nimble_file)
-    do
-      local key, val = line:match("^%s*(%S+)%s*=%s*(%S+)")
-      if key ~= nil and val ~= nil
+    local project = parse_nimble(nimble_file)
+    if project.bin == nil
+    then -- if project builds no binaries
+      -- trying to consider as root a file with name similar to nimble file
+      project.root = tostring(nimble_file:match("(.*%.)[^/\\]+"))..".nim"
+      if not file_exists(project.root)
       then
-        if key == "bin"
-        then
-          bin = val
-        elseif key == "srcDir"
-        then
-          srcdir = val
+        -- if it does not exists checking it in srcdir(if exists)
+        project.root = root_dir..sep..(project.srcdir or "")..
+          project.root:match(".*([/\\][^/\\]+)$")
+        if not file_exists(project.root)
+        then -- finally give up, project root will be a given file
+          project.root = filename
         end
       end
+    else -- otherwise root file is a file that transforms to a binary
+      project.root = root_dir..sep..(project.srcdir or "")..
+        sep..project.bin..".nim"
     end
-    return root_dir..sep..srcdir..sep..bin..".nim"
+    return project
   end
-  return filename
+  local dummy_project = 
+  {
+    backend = "c",
+    srcdir = root_dir,
+    root = filename
+  } -- When no nimble file detected - just return dummy project for one file
+  return dummy_project
 end
 
 return _M
