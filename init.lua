@@ -38,7 +38,7 @@ local on_file_load = function()
   if buffer ~= nil and buffer:get_lexer(true) == "nim" then
     buffer.use_tabs = false
     buffer.tab_width = 2
-    buffer.nim_backend = "c"
+    nimsuggest.check()
   end
 end
 
@@ -74,12 +74,6 @@ local actions_on_symbol = {
   end,
 }
 
-local function check_syntax()
-  -- Performs syntax check and shows errors
-  if buffer:get_lexer() ~= "nim" then return end
-  nimsuggest.check()
-end
-
 local function nim_complete(name)
   -- Returns a list of suggestions for autocompletion
   local shift = 0
@@ -103,11 +97,10 @@ local function nim_complete(name)
 end
 
 if check_executable(constants.nimsuggest_exe) then
-  events.connect(events.FILE_AFTER_SAVE, check_syntax)
+  events.connect(events.FILE_AFTER_SAVE, on_file_load)
   events.connect(events.QUIT, nim_shutdown_all_sessions)
   events.connect(events.RESET_BEFORE, nim_shutdown_all_sessions)
   events.connect(events.FILE_OPENED, on_file_load)
-  events.connect(events.FILE_OPENED, check_syntax)
   events.connect(events.BUFFER_DELETED, on_buffer_delete)
   events.connect(events.CHAR_ADDED, function(ch)
     if buffer:get_lexer() ~= "nim" or ch > 90 or actions_on_symbol[ch] == nil
