@@ -137,6 +137,14 @@ if check_executable(constants.nimsuggest_exe) then
   textadept.editing.autocompleters.nim = nim_complete
 end
 if check_executable(constants.nim_compiler_exe) then
-  textadept.run.compile_commands.nim = function () return nim_compiler.." "..buffer.nim_backend.." %p" end
-  textadept.run.run_commands.nim = function () return nim_compiler.." "..buffer.nim_backend.." --run %p" end
+  textadept.run.compile_commands.nim = function ()
+    return nim_compiler.." "..
+      sessions.active[sessions.session_of(buffer.filename)].project.backend..
+      " %p"
+  end
+  textadept.run.run_commands.nim = function ()
+    return nim_compiler.." "..
+      sessions.active[sessions.session_of(buffer.filename)].project.backend..
+      " --run %p"
+  end
 end
