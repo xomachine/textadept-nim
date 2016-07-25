@@ -122,4 +122,19 @@ function _M:request(command, filename)
   return message_list
 end
 
+function _M:stop_all()
+  -- Stops all nimsuggest sessions.
+  -- Use at exit or reset only
+  for file, session in pairs(_M.active)
+  do
+    if session.handle ~= nil and session.handle:status() ~= "terminated"
+    then
+      session.handle:write("quit\n\n")
+      session.handle:close()
+    end
+  end
+  _M.active = nil
+  _M.session_of = nil
+end
+
 return _M
