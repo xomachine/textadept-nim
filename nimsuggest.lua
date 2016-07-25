@@ -1,7 +1,33 @@
 local check_type = require("textadept-nim.utils").check_type
 local sessions = require("textadept-nim.sessions")
 
-
+local function parse_suggestion(answer)
+  -- Parses output of nimsuggest containing a suggestion
+  -- and returns a table with suggestion fields
+  if answer == nil then return end
+  local suggestion = {}
+  local tail = ""
+  suggestion.request, suggestion.skind, tail =
+    answer:match("^(%l+)\t(sk%u%a+)\t(.*)$")
+  if suggestion.request == "highlight"
+  then
+    suggestion.line, suggestion.column, suggestion.length =
+      tail:match("^(%d+)\t(%d+)\t(%d+)%s*$")
+  elseif suggestion.request ~= nil
+  then
+    suggestion.fullname, suggestion.type, suggestion.file, suggestion.line,
+      suggestion.column, suggestion.comment, suggestion.length =
+      tail:match("^([^\t]+)\t([^\t]*)\t([^\t]+)\t(%d+)\t(%d+)\t\"(.*)\"\t(%d+)")
+    suggestion.modulename, suggestion.functionname, suggestion.name =
+      suggestion.fullname:match("^([^%.]+)%.*([^%.]-)%.([^%.]+)$")
+    suggestion.name = suggestion.name or suggestion.fullname
+    suggestion.comment = suggestion.comment:gsub("\\x0A", "\n")
+    suggestion.comment = suggestion.comment:gsub("\\", "")
+  else
+    return
+  end
+  return suggestion
+end
 
 local function make_request(command, pos)
   -- Request nimsuggest session to do a command then returns parsed answer
@@ -15,12 +41,18 @@ local function make_request(command, pos)
   local position = pos ~= nil and (":"..tostring(buffer.line_from_position(pos)+1)..
     ":".. tostring(buffer.column[pos]+1)) or "" -- TODO: check it's correctness
   local request = command.." "..filename..";"..dirtyname..position
-  local answer = sessions:request(request, filename)
+  local answers = sessions:request(request, filename)
   if dirtyname ~= filename
   then
     os.remove(dirtyname)
   end
-  return answer
+  local suggestion_list = {}
+  for i, answer in pairs(answers)
+  do
+    local suggestion = parse_suggestion(answer)
+    table.insert(suggestion_list, suggestion)
+  end
+  return suggestion_list
 end
 
 local _M = {}
