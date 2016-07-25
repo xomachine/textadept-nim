@@ -105,6 +105,7 @@ end
 if check_executable(constants.nimsuggest_exe) then
   events.connect(events.FILE_AFTER_SAVE, check_syntax)
   events.connect(events.QUIT, nim_shutdown_all_sessions)
+  events.connect(events.RESET_BEFORE, nim_shutdown_all_sessions)
   events.connect(events.FILE_OPENED, on_file_load)
   events.connect(events.FILE_OPENED, check_syntax)
   events.connect(events.BUFFER_DELETED, on_buffer_delete)
