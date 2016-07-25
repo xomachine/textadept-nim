@@ -3,7 +3,7 @@ local errortips = require("textadept-nim.errortips")
 local parse_errors = errortips.parse_errors
 local error_handler = errortips.error_handler
 local get_root = require("textadept-nim.project").detect_project_root
-
+local nimsuggest_executable = require("textadept-nim.constants").nimsuggest_exe
 
 local _M = {}
 
@@ -12,7 +12,7 @@ _M.active = {}
 -- Filename-to-sessionname association
 _M.session_of = {}
 
-local nimsuggest_executable = "nimsuggest"..(WIN32 and ".exe" or "")
+
 
 function _M:get_handle(filename)
   -- Creates new session for file if it isn't exist and returns

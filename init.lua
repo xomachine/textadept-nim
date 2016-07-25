@@ -1,19 +1,11 @@
 local textadept = require("textadept")
 local events = require("events")
-local nimsuggest_executable = "nimsuggest"
-local nim_compiler = "nim"
-local nimble_exe = "nimble"
+local constants = require("textadept-nim.constants")
 local icons = require("textadept-nim.icons")
 local nimsuggest = require("textadept-nim.nimsuggest")
 local check_executable = require("textadept-nim.utils").check_executable
 local sessions = require("textadept-nim.sessions")
 local nim_shutdown_all_sessions = function() sessions:stop_all() end
--- Windows executable names 
-if WIN32 then
-  nimsuggest_executable = nimsuggest_executable .. ".exe"
-  nim_compiler = nim_compiler .. ".exe"
-  nimble_exe = nimble_exe .. ".exe"
-end
 
 -- Keybinds:
 -- API Helper key
@@ -124,7 +116,7 @@ local function nim_complete(name)
   return shift, suggestions
 end
 
-if check_executable(nimsuggest_executable) then
+if check_executable(constants.nimsuggest_exe) then
   events.connect(events.FILE_AFTER_SAVE, check_syntax)
   events.connect(events.QUIT, nim_shutdown_all_sessions)
   events.connect(events.FILE_OPENED, on_file_load)
@@ -156,7 +148,7 @@ if check_executable(nimsuggest_executable) then
   }
   textadept.editing.autocompleters.nim = nim_complete
 end
-if check_executable(nim_compiler) then
+if check_executable(constants.nim_compiler_exe) then
   textadept.run.compile_commands.nim = function () return nim_compiler.." "..buffer.nim_backend.." %p" end
   textadept.run.run_commands.nim = function () return nim_compiler.." "..buffer.nim_backend.." --run %p" end
 end
