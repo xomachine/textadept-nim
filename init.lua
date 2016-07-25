@@ -123,7 +123,8 @@ if check_executable(constants.nimsuggest_exe) then
         local answer = nimsuggest.definition(buffer.current_pos)
         if #answer > 0 then
           buffer:call_tip_show(buffer.current_pos,
-          answer[1].name.." - "..answer[1].type.."\n"..answer[1].comment)
+          answer[1].skind:match("sk(.*)").." "..answer[1].name..": "..
+          answer[1].type.."\n"..answer[1].comment)
         end
       end
     end,
