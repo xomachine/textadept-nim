@@ -13,16 +13,6 @@ local api_helper_key = "ch"
 -- GoTo Definition key
 local goto_definition_key = "cG"
 
--- list of active nimsuggest sessions
-local active_sessions = {}
--- colors of compiller messages
-local message_styles = {
-  ["Error"] = 15, -- ORANGE
-  ["Hint"]  = 3, -- PALE GREEN
-  ["Warning"] = 13 -- YELLOW,
-}
-
-
 local on_buffer_delete = function()
   -- Checks if any nimsuggest session left without
   -- binding to buffer.
@@ -42,8 +32,6 @@ local on_buffer_delete = function()
   end
 end
 
-
-
 local on_file_load = function()
   -- Called when editor loads file.
   -- Trying to get information about project and starts nimsuggest
@@ -53,8 +41,6 @@ local on_file_load = function()
     buffer.nim_backend = "c"
   end
 end
-
-
 
 local function gotoDeclaration(position)
   -- Puts cursor to declaration
