@@ -31,45 +31,22 @@ local message_styles = {
 }
 
 
-
-local function nim_start_session(files)
-  -- Starts new nimsuggest session when it doesn't exist
-  -- otherwise binds existing session to current buffer
-  if active_sessions[files] == nil then
-    local current_dir = io.get_project_root(buffer.filename) or buffer.filename:match("^([%p%w]-)[^/\\]+$") or "."
-    active_sessions[files] = spawn(nimsuggest_executable.." --stdin "..files, current_dir , error_handler, parse_errors, error_handler)
-    if active_sessions[files] == nil or active_sessions[files]:status() ~= "running" then
-      error("Cannot start nimsuggest!")
-    end
-  end
-  buffer.nimsuggest_files = files
-end
-
-local function nim_shutdown_session (nimhandle)
-  -- Closes given nimsuggest session
-  if nimhandle ~= nil and nimhandle:status() ~= "terminated" then
-    nimhandle:write("quit\n\n")
-    nimhandle:close()
-  end
-end
-
 local on_buffer_delete = function()
   -- Checks if any nimsuggest session left without
   -- binding to buffer.
   -- All unbound sessions will be closed
   local to_remove = {}
-  for k, v in pairs(active_sessions) do
+  for k, v in pairs(sessions.session_of) do
     local keep = false
     for i, b in ipairs(_BUFFERS) do
-      if b.nimsuggest_files ~= nil then
-        if b.nimsuggest_files == k then keep = true end
+      if b.filename ~= nil then
+        if b.filename == k then keep = true end
       end
     end
     if not keep then table.insert(to_remove, k) end
   end
   for i, v in pairs(to_remove) do
-    nim_shutdown_session(active_sessions[v])
-    active_sessions[v] = nil
+    sessions:detach(v)
   end
 end
 
@@ -127,7 +104,6 @@ end
 
 local function nim_complete(name)
   -- Returns a list of suggestions for autocompletion
-  local  command = "sug"
   local shift = 0
   for i = 1, buffer.column[buffer.current_pos] do
     local c = buffer.char_at[buffer.current_pos - i]
