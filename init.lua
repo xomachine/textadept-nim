@@ -79,9 +79,13 @@ local function nim_complete(name)
   buffer.auto_c_separator = 35
   icons:register()
   local shift = 0
-  for i = 1, buffer.column[buffer.current_pos] do
-    local c = buffer.char_at[buffer.current_pos - i]
-    if (c >= 32 and c <= 47)or(c >= 58 and c <= 64)then
+  local curline = buffer:get_cur_line()
+  local cur_col = buffer.column[buffer.current_pos] + 1
+  for i = 1, cur_col do
+    local shifted_col = cur_col - i
+    local c = curline:sub(shifted_col, shifted_col)
+    if c == c:match("([^%w_-])")
+    then
       shift = i - 1
       break
     end
