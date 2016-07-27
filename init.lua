@@ -76,6 +76,8 @@ local actions_on_symbol = {
 
 local function nim_complete(name)
   -- Returns a list of suggestions for autocompletion
+  buffer.auto_c_separator = 35
+  icons:register()
   local shift = 0
   for i = 1, buffer.column[buffer.current_pos] do
     local c = buffer.char_at[buffer.current_pos - i]
@@ -87,13 +89,24 @@ local function nim_complete(name)
   local suggestions = {}
   local token_list = nimsuggest.suggest(buffer.current_pos-shift)
   for i, v in pairs(token_list) do
-    table.insert(suggestions, v.name.."?"..icons[v.skind])
+    table.insert(suggestions, v.name..": "..v.type.."?"..icons[v.skind])
   end
   if #suggestions == 0 then
     return textadept.editing.autocompleters.word(name)
   end
-  icons:register()
   return shift, suggestions
+end
+
+local function remove_type_info(text, position)
+  local name = text:match("^([^:]+):.*")
+  if name ~= nil
+  then
+    local pos = buffer.current_pos
+    local to_paste = name:sub(pos-position+1)
+    buffer:insert_text(pos, to_paste)
+    buffer:word_right_end()
+  end
+  buffer:auto_c_cancel()
 end
 
 if check_executable(constants.nimsuggest_exe) then
@@ -102,6 +115,7 @@ if check_executable(constants.nimsuggest_exe) then
   events.connect(events.RESET_BEFORE, nim_shutdown_all_sessions)
   events.connect(events.FILE_OPENED, on_file_load)
   events.connect(events.BUFFER_DELETED, on_buffer_delete)
+  events.connect(events.AUTO_C_SELECTION, remove_type_info)
   events.connect(events.CHAR_ADDED, function(ch)
     if buffer:get_lexer() ~= "nim" or ch > 90 or actions_on_symbol[ch] == nil
     then return end
