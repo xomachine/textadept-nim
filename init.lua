@@ -102,6 +102,9 @@ local function nim_complete(name)
 end
 
 local function remove_type_info(text, position)
+  if buffer == nil or buffer:get_lexer(true) ~= "nim" then
+    return
+  end
   local name = text:match("^([^:]+):.*")
   if name ~= nil
   then
