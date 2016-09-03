@@ -55,7 +55,7 @@ function _M.detect_project(filename)
     if project.bin == nil
     then -- if project builds no binaries
       -- trying to consider as root a file with name similar to nimble file
-      project.root = tostring(nimble_file:match("(.*%.)[^/\\]+"))..".nim"
+      project.root = tostring(nimble_file:match("(.*%.)[^/\\]+")).."nim"
       if not file_exists(project.root)
       then
         -- if it does not exists checking it in srcdir(if exists)
