@@ -22,7 +22,7 @@ function _M.check_executable(exe)
 end
 
 function _M.file_exists(filename)
-  local f = open(filename, "r")
+  local f = io.open(filename, "r")
   if f ~= nil
   then
     f:close()
