@@ -19,7 +19,7 @@ function _M:get_handle(filename)
   -- handle for the session
   check_type("string", filename)
   local session_name = _M.session_of[filename]
-  if session_name == nil
+  if session_name == nil or _M.active[session_name] == nil
   then
     local project = get_project(filename)
     session_name = project.root
