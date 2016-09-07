@@ -52,23 +52,27 @@ function _M.detect_project(filename)
   if #nimble_file > 0
   then
     local project = parse_nimble(nimble_file)
-    if project.bin == nil
-    then -- if project builds no binaries
-      -- trying to consider as root a file with name similar to nimble file
-      project.root = tostring(nimble_file:match("(.*%.)[^/\\]+")).."nim"
-      if not file_exists(project.root)
-      then
-        -- if it does not exists checking it in srcdir(if exists)
-        project.root = root_dir..sep..(project.srcdir or "")..
-          project.root:match(".*([/\\][^/\\]+)$")
-        if not file_exists(project.root)
-        then -- finally give up, project root will be a given file
-          project.root = filename
-        end
-      end
-    else -- otherwise root file is a file that transforms to a binary
+    if project.bin ~= nil
+    then -- root file is a file that transforms to a binary
       project.root = root_dir..sep..(project.srcdir or "")..
         sep..project.bin..".nim"
+      if file_exists(project.root)
+      then
+        return project
+      end
+    end
+    -- if project builds no binaries
+    -- trying to consider as root a file with name similar to nimble file
+    project.root = tostring(nimble_file:match("(.*%.)[^/\\]+")).."nim"
+    if not file_exists(project.root)
+    then
+      -- if it does not exists checking it in srcdir(if exists)
+      project.root = root_dir..sep..(project.srcdir or "")..
+        project.root:match(".*([/\\][^/\\]+)$")
+      if not file_exists(project.root)
+      then -- finally give up, project root will be a given file
+        project.root = filename
+      end
     end
     return project
   end
