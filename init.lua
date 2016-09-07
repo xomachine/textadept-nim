@@ -74,6 +74,22 @@ local actions_on_symbol = {
   end,
 }
 
+
+local function remove_type_info(text, position)
+  if buffer == nil or buffer:get_lexer(true) ~= "nim" then
+    return
+  end
+  local name = text:match("^([^:]+):.*")
+  if name ~= nil
+  then
+    local pos = buffer.current_pos
+    local to_paste = name:sub(pos-position+1)
+    buffer:insert_text(pos, to_paste)
+    buffer:word_right_end()
+    buffer:auto_c_cancel()
+  end
+end
+
 local function nim_complete(name)
   -- Returns a list of suggestions for autocompletion
   buffer.auto_c_separator = 35
@@ -98,22 +114,11 @@ local function nim_complete(name)
   if #suggestions == 0 then
     return textadept.editing.autocompleters.word(name)
   end
-  return shift, suggestions
-end
-
-local function remove_type_info(text, position)
-  if buffer == nil or buffer:get_lexer(true) ~= "nim" then
+  if #suggestions == 1 then
+    remove_type_info(suggestions[1], buffer.current_pos - shift)
     return
   end
-  local name = text:match("^([^:]+):.*")
-  if name ~= nil
-  then
-    local pos = buffer.current_pos
-    local to_paste = name:sub(pos-position+1)
-    buffer:insert_text(pos, to_paste)
-    buffer:word_right_end()
-  end
-  buffer:auto_c_cancel()
+  return shift, suggestions
 end
 
 if check_executable(constants.nimsuggest_exe) then
