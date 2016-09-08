@@ -6,12 +6,15 @@ local nimsuggest = require("textadept-nim.nimsuggest")
 local check_executable = require("textadept-nim.utils").check_executable
 local sessions = require("textadept-nim.sessions")
 local nim_shutdown_all_sessions = function() sessions:stop_all() end
+local renamer = require("textadept-nim.rename")
 
 -- Keybinds:
 -- API Helper key
 local api_helper_key = "ch"
 -- GoTo Definition key
 local goto_definition_key = "cG"
+-- Smart replacer key
+local smart_replace_key = "cg"
 
 local on_buffer_delete = function()
   -- Checks if any nimsuggest session left without
@@ -152,6 +155,8 @@ if check_executable(constants.nimsuggest_exe) then
     [goto_definition_key] = function()
       gotoDeclaration(buffer.current_pos)
     end,
+    -- Smart replace
+    [smart_replace_key] = renamer.spawn_dialog,
   }
   textadept.editing.autocompleters.nim = nim_complete
 end
