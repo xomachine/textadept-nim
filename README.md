@@ -8,11 +8,12 @@ Warning! Work still in progress!
 
 ## Features:
 * Autocomplete via nimsuggest (default on Ctrl+Space or when "." is typed)
-* Documentation helper on Ctrl+H
-* Goto definition on Ctrl+Shift+G
+* Documentation helper (on Ctrl+H by default)
+* Goto definition (on Ctrl+Shift+G by default)
 * Error highlighting when file is saved or opened
 * CallTip popups when brace is opened
 * Project build support
+* Smart replacing of both var/proc/... definition and usages (on Ctrl+G by default)
 * Compile command depends on backend defined in related nimble file
 * All source files from project involved to suggestion generation
 
@@ -26,3 +27,4 @@ Clone this repository to "~/.textadept/modules/" and put following line into you
 ``` lua
 require "textadept-nim"
 ```
+It's possible to change default key bindings by editing "~/.textadept/modules/init.lua"
