@@ -26,6 +26,8 @@ local function parse_suggestion(answer)
   else
     return
   end
+  suggestion.line = tonumber(suggestion.line)
+  suggestion.column = tonumber(suggestion.column)
   return suggestion
 end
 
@@ -83,7 +85,7 @@ end
 
 function _M.usage(pos)
   check_type("number", pos)
-  local messages = make_request("use", pos)
+  return make_request("use", pos)
 end
 
 function _M.def_and_use(pos)
