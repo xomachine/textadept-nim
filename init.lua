@@ -163,7 +163,7 @@ end
 if check_executable(constants.nim_compiler_exe) then
   textadept.run.compile_commands.nim = function ()
     return constants.nim_compiler_exe.." "..
-      sessions.active[sessions.session_of(buffer.filename)].project.backend..
+      sessions.active[sessions.session_of[buffer.filename]].project.backend..
       " %p"
   end
   textadept.run.run_commands.nim = function ()
