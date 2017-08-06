@@ -47,7 +47,7 @@ function _M.detect_project(filename)
           return false
         end
       end,
-    "!.*","", 0, false)
+    "!.*")
   
   if #nimble_file > 0
   then
