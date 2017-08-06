@@ -1,5 +1,6 @@
 local check_type = require("textadept-nim.utils").check_type
 local sessions = require("textadept-nim.sessions")
+local highlight_errors = require("textadept-nim.errortips").highlight_errors
 
 local function parse_suggestion(answer)
   -- Parses output of nimsuggest containing a suggestion
@@ -17,7 +18,8 @@ local function parse_suggestion(answer)
   then
     suggestion.fullname, suggestion.type, suggestion.file, suggestion.line,
       suggestion.column, suggestion.comment, suggestion.length =
-      tail:match("^([^\t]+)\t([^\t]*)\t([^\t]+)\t(%d+)\t(%d+)\t\"(.*)\"\t(%d+)")
+      tail:match("^([^\t]*)\t([^\t]*)\t([^\t]+)\t(%d+)\t(%d+)\t\"(.*)\"\t(%d+)")
+    if suggestion.fullname == nil then return end
     suggestion.modulename, suggestion.functionname, suggestion.name =
       suggestion.fullname:match("^([^%.]+)%.*([^%.]-)%.([^%.]+)$")
     suggestion.name = suggestion.name or suggestion.fullname
@@ -61,7 +63,8 @@ local _M = {}
 
 function _M.check()
   -- Requests nimsuggest to check buffer
-  make_request("chk")
+  local answer = make_request("chk")
+  highlight_errors(answer)
   make_request("debug")
   -- Required to turn off debug mode what automaticaly enabled after chk
 end

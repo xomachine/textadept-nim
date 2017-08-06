@@ -31,4 +31,12 @@ function _M.file_exists(filename)
   return false
 end
 
+function _M.thesamefile(fn1, fn2)
+  local fa1 = lfs.attributes(fn1, "ino", "size", "access", "modification",
+                             "change")
+  local fa2 = lfs.attributes(fn2, "ino", "size", "access", "modification",
+                             "change")
+  return fa1 == fa2
+end
+
 return _M

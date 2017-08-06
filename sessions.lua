@@ -39,6 +39,8 @@ function _M:get_handle(filename)
     -- create new session
     local current_dir = session_name:match("^(.+)[/\\][^/\\]+$") or "."
     local current_handler = function(code)
+      --Hints mistakenly treated as errors
+      if code:match("^Hint.*") then return end
       error_handler(_M.active[session_name], code)
     end
     if consts.VERMAGIC < 807 then

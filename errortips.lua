@@ -1,4 +1,4 @@
-
+local thesamefile = require("textadept-nim.utils").thesamefile
 local _M = {}
 local message_styles = {
   ["Error"] = 15, -- ORANGE
@@ -9,59 +9,63 @@ local message_styles = {
 function _M.parse_errors(answers)
   -- Parses output of nimsuggest containing an error
   -- and returns a table with error fields
-  buffer:annotation_clear_all()
-  local nested = nil
-  local previous = nil
+  if type(answers) == "number" then return end
   if answers:match("^Error") then
     error_handler(answers)
     return nil
   end
+  local suggestion_list = {}
   for answer in answers:gmatch("[^\n]+") do
     local message = {}
-    message.msgtype, message.text = answer:match("(%u%l+):(.*)")
-    message.file, message.line, message.col = answer:match(
+    message.type, message.comment = answer:match("(%u%l+):(.*)")
+    message.file, message.line, message.column = answer:match(
     "^([^%(]+)%s*%(([0-9]+),%s*([0-9]+)%)")
+    table.insert(suggestion_list, message)
+  end
+  _M.highlight_errors(suggestion_list)
+ end
+
+function _M.highlight_errors(suggestion_list)
+  -- Sets the errors from list as annotations
+  buffer:annotation_clear_all()
+  local nested = nil
+  local previous = nil
+  for i, message in pairs(suggestion_list) do
     -- If message should be added to previous for 
     -- recognizing its type
     if nested ~= nil then
-      message.text = answer
       message.file = nested.file
       message.line = nested.line
       -- If message still untyped - look for next one
       -- otherwise reset "nested" and proceed next message
       -- in normal way
-      if message.msgtype ~= nil then
+      if message.type ~= nil then
         nested = nil
       else
-        message.msgtype = "Info"
+        message.type = "Info"
       end
     end
     -- If unable to parse string after parsed message - append it to the last message
-    if message.msgtype == nil and message.file == nil and previous ~= nil then
-      message = previous
-      message.text = answer
-      message.msgtype = "Info"
-    end
-    if message.file ~= nil and buffer.filename:match(message.file.."$") ~= nil then 
+    if message.file ~= nil and thesamefile(buffer.filename, message.file) then 
       previous = message
       -- If message has no type but associated with file
       -- it must be generic/template issue and its type
       -- will be found in next messages
       -- nested - place where message should be added to
-      if message.msgtype == nil  then
-        message.text = answer:match("%)(.*)")
+      if message.type == nil  then
+        message.comment = answer:match("%)(.*)")
         nested = message
-        message.msgtype = "Info"
+        message.type = "Info"
       end
       local line = tonumber(message.line) - 1
       local a = buffer.annotation_text[line]
-      local text = message.msgtype..": " ..message.text
+      local comment = message.type..": " ..message.comment
       if a:len() > 0 then
-        buffer.annotation_text[line] = a.."\n"..text
+        buffer.annotation_text[line] = a.."\n"..comment
       else
-        buffer.annotation_text[line] = text
+        buffer.annotation_text[line] = comment
       end
-      local style = message_styles[message.msgtype]
+      local style = message_styles[message.type]
       if style ~= nil and buffer.annotation_style[line] < style then
         buffer.annotation_style[line] = style
       end
