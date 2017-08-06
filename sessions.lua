@@ -3,7 +3,8 @@ local errortips = require("textadept-nim.errortips")
 local parse_errors = errortips.parse_errors
 local error_handler = errortips.error_handler
 local get_project = require("textadept-nim.project").detect_project
-local nimsuggest_executable = require("textadept-nim.constants").nimsuggest_exe
+local consts = require("textadept-nim.constants")
+local nimsuggest_executable = consts.nimsuggest_exe
 
 local _M = {}
 
@@ -40,8 +41,15 @@ function _M:get_handle(filename)
     local current_handler = function(code)
       error_handler(_M.active[session_name], code)
     end
-    session.handle = spawn(nimsuggest_executable.." --stdin --debug --v2 "..session_name, 
-      current_dir, current_handler, parse_errors, current_handler)
+    if consts.VERMAGIC < 807 then
+      session.handle = spawn(nimsuggest_executable.." --stdin --debug --v2 "..
+                             session_name, current_dir, current_handler,
+                             parse_errors, current_handler)
+    else
+      session.handle = spawn(nimsuggest_executable.." --stdin --debug --v2 "..
+                             session_name, current_dir, nil, current_handler,
+                             parse_errors, current_handler)
+    end
     if session.handle == nil or
       session.handle:status() ~= "running"
     then
