@@ -23,7 +23,7 @@ Warning! Work still in progress!
 * nimble (for project building)
 
 ## Installation
-Clone this repository to "~/.textadept/modules/" and put following line into your "~/.textadept/init.lua":
+Clone this repository to "\~/.textadept/modules/" and put following line into your "\~/.textadept/init.lua":
 ``` lua
 require "textadept-nim"
 ```
