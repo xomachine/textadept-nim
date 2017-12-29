@@ -42,7 +42,7 @@ do
     if f == nil then
       ui.print("PANIC! Can't open file "..tostring(fname))
     else
-      _M.xpms[xpm] = f:read("a")
+      _M.xpms[xpm] = f:read("*a")
       f:close()
     end
   end
