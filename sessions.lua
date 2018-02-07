@@ -52,6 +52,11 @@ function _M:get_handle(filename)
                              session_name, current_dir, nil, current_handler,
                              parse_errors, current_handler)
     end
+    local ans = ""
+    -- Skip until eof
+    repeat
+      ans = session.handle:read()
+    until ans == nil or ans:sub(1,5) == "!EOF!"
     if session.handle == nil or
       session.handle:status() ~= "running"
     then
