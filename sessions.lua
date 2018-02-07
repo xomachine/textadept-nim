@@ -44,11 +44,11 @@ function _M:get_handle(filename)
       error_handler(_M.active[session_name], code)
     end
     if consts.VERMAGIC < 807 then
-      session.handle = spawn(nimsuggest_executable.." --stdin --debug --v2 "..
+      session.handle = spawn(nimsuggest_executable.." --stdin --tester --debug --v2 "..
                              session_name, current_dir, current_handler,
                              parse_errors, current_handler)
     else
-      session.handle = spawn(nimsuggest_executable.." --stdin --debug --v2 "..
+      session.handle = spawn(nimsuggest_executable.." --stdin --tester --debug --v2 "..
                              session_name, current_dir, nil, current_handler,
                              parse_errors, current_handler)
     end
@@ -100,7 +100,7 @@ function _M:request(command, filename)
   local message_list = {}
   repeat
     local answer = nimhandle:read()
-    if answer == "" then
+    if answer:sub(1,5) == "!EOF!" then
       break
     end
     table.insert(message_list, answer)
