@@ -36,8 +36,9 @@ end
 local function make_request(command, pos)
   -- Request nimsuggest session to do a command then returns parsed answer
   local filename = buffer.filename
-  local dirtyname = buffer.modify and (os.tmpname():sub(2) or tostring(filename)..".tmp") or filename
-
+  local dirtyname = buffer.modify and
+                    ((WIN32 and os.getenv("TEMP") or "")..os.tmpname()) or
+                    filename
   if buffer.modify then
     local tmpfile = io.open(dirtyname, "w")
     tmpfile:write(buffer:get_text())
