@@ -47,8 +47,12 @@ function _M:get_handle(filename)
       session.handle = spawn(nimsuggest_executable.." --stdin --tester --debug --v2 "..
                              session_name, current_dir, current_handler,
                              parse_errors, current_handler)
-    else
+    elseif consts.VERMAGIC < 1002 then
       session.handle = spawn(nimsuggest_executable.." --stdin --tester --debug --v2 "..
+                             session_name, current_dir, nil, current_handler,
+                             parse_errors, current_handler)
+    else
+      session.handle = os.spawn(nimsuggest_executable.." --stdin --tester --debug --v2 "..
                              session_name, current_dir, nil, current_handler,
                              parse_errors, current_handler)
     end
