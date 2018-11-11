@@ -104,21 +104,17 @@ local function nim_complete(name)
   for i = 1, cur_col do
     local shifted_col = cur_col - i
     local c = curline:sub(shifted_col, shifted_col)
-    if c == c:match("([^%w_-])")
+    shift = i - 1
+    if c:match("[^%w_]")
     then
-      shift = i - 1
       break
     end
     startprefix = shifted_col
   end
   local suggestions = {}
-  local prefix = curline:sub(startprefix, cur_col-1)
   local token_list = nimsuggest.suggest(buffer.current_pos-shift)
   for i, v in pairs(token_list) do
-    local start, _ = v.name:find(prefix, 0, 1)
-    if start == 1 then
-      table.insert(suggestions, v.name..": "..v.type.."?"..icons[v.skind])
-    end
+    table.insert(suggestions, v.name..": "..v.type.."?"..icons[v.skind])
   end
   if #suggestions == 0 then
     return textadept.editing.autocompleters.word(name)
