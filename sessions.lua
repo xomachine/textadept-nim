@@ -37,7 +37,7 @@ function _M:get_handle(filename)
     session.handle:status() ~= "running"
   then
     -- create new session
-    local current_dir = session_name:match("^(.+)[/\\][^/\\]+$") or "."
+    session.current_dir = session_name:match("^(.+)[/\\][^/\\]+$") or "."
     local current_handler = function(code)
       --Hints mistakenly treated as errors
       if code:match("^Hint.*") then return end
@@ -45,15 +45,15 @@ function _M:get_handle(filename)
     end
     if consts.VERMAGIC < 807 then
       session.handle = spawn(nimsuggest_executable.." --stdin --tester --debug --v2 "..
-                             session_name, current_dir, current_handler,
+                             session_name, session.current_dir, current_handler,
                              parse_errors, current_handler)
     elseif consts.VERMAGIC < 1002 then
       session.handle = spawn(nimsuggest_executable.." --stdin --tester --debug --v2 "..
-                             session_name, current_dir, nil, current_handler,
+                             session_name, session.current_dir, nil, current_handler,
                              parse_errors, current_handler)
     else
       session.handle = os.spawn(nimsuggest_executable.." --stdin --tester --debug --v2 "..
-                             session_name, current_dir, nil, current_handler,
+                             session_name, session.current_dir, nil, current_handler,
                              parse_errors, current_handler)
     end
     local ans = ""
@@ -73,7 +73,7 @@ function _M:get_handle(filename)
     session.files = {}
   end
   session.files[filename] = true
-  return session.handle
+  return session
 end
 
 function _M:detach(filename)
@@ -104,7 +104,12 @@ end
 function _M:request(command, filename)
   -- Requesting nimsuggest to do command and returns
   -- parsed answer as a structure
-  local nimhandle = _M:get_handle(filename)
+  local session = _M:get_handle(filename)
+  local nimhandle = session.handle
+  local i = command:find(session.current_dir, 0, 1)
+  if i > 0 then
+    command = command:sub(0, i-1)..command:sub(i+session.current_dir:len()+1)
+  end
   nimhandle:write(command.."\n")
   local message_list = {}
   repeat
