@@ -46,7 +46,7 @@ local function make_request(command, pos)
   end
   local position = pos ~= nil and (":"..tostring(buffer.line_from_position(pos)+1)..
     ":".. tostring(buffer.column[pos]+1)) or "" -- TODO: check it's correctness
-  local request = command.." "..filename..";"..dirtyname..position
+  local request = command.." \""..filename.."\";\""..dirtyname.."\""..position
   local answers = sessions:request(request, filename)
   if dirtyname ~= filename
   then

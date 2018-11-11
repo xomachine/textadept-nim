@@ -106,10 +106,6 @@ function _M:request(command, filename)
   -- parsed answer as a structure
   local session = _M:get_handle(filename)
   local nimhandle = session.handle
-  local i = command:find(session.current_dir, 0, 1)
-  if i > 0 then
-    command = command:sub(0, i-1)..command:sub(i+session.current_dir:len()+1)
-  end
   nimhandle:write(command.."\n")
   local message_list = {}
   repeat
