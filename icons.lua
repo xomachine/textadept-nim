@@ -31,7 +31,7 @@ local _M =
 
 _M.xpms = {}
 
-local current_dir = debug.getinfo(1).short_src:match("(.*)icons.lua")
+local current_dir = debug.getinfo(1).source:match("([^@]*)icons.lua")
 
 
 for xpm, t in pairs(_M)
